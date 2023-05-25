@@ -1,0 +1,55 @@
+import sys
+import os
+import re
+from time import localtime, asctime, time
+import ctypes
+
+def log(msg):
+    print(asctime(localtime(time())) + ": " + msg)
+
+def copyFiles(sourceDir, destDir):
+    try:
+        files = os.listdir(sourceDir)
+    except:
+        log("Couldn't list file in " + sourceDir)
+    for file in files:
+        sourceFile = os.path.join(sourceDir, file)
+        destFile = os.path.join(destDir, file)
+        if os.path.isfile(sourceFile):
+            log("Copying file from %s to %s" % (sourceFile, destFile))
+            ctypes.windll.kernel32.CopyFileW(sourceFile, destFile, False)
+            log("Deleting %s" % sourceFile)
+            ctypes.windll.kernel32.DeleteFileW(sourceFile)
+        if os.path.isdir(sourceFile):
+            log("%s is a DIRECTORY - NOT COPYING ACROSS" % sourceFile)
+
+def createDir(archiveDir):
+    try:
+        if os.path.isdir(archiveDir):
+            log("DIRECTORY ALREADY EXISTED := " + archiveDir)
+            pass
+        else:
+            os.mkdir(archiveDir)
+            log("DIRECTORY CREATED:= " + archiveDir)
+    except Exception as e:
+        raise RuntimeError("Couldn't Create Archiving Directory: " + archiveDir) from e
+
+def archFiles(sourceDir, cobDate):
+    log("CREATING DIR FOR ARCHIVING FILE - STARTED")
+    archiveDir = os.path.join(sourceDir, "old", cobDate)
+    createDir(archiveDir)
+    log("CREATION - DONE")
+    log("")
+    log("COPYING FILES TO ARCHIVE DIR - STARTED")
+    copyFiles(sourceDir, archiveDir)
+    log("COPY - DONE")
+
+def main(argv=[]):
+    myarg = argv[1:]
+    print("Args = %s" % myarg)
+    sourceDir = sys.argv[1]
+    cobDate = sys.argv[2]
+    archFiles(sourceDir, cobDate)
+
+if __name__ == "__main__":
+    main(sys.argv)
