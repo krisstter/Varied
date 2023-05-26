@@ -1,4 +1,4 @@
-tringBuilder requestUrlBuilder = new StringBuilder();
+StringBuilder requestUrlBuilder = new StringBuilder();
 requestUrlBuilder.AppendFormat("{0}/{1}/snapshot/{2}?entityType=BOOK", EndPointUrl, LinguaVersion, region);
 string requestUrl = requestUrlBuilder.ToString();
 
