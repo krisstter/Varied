@@ -1,0 +1,31 @@
+public void SaveSnapshot(string region, string snapshotFilePath)
+{
+    string requestUrl = string.Format("{0}/{1}/snapshot/{2}?entityType=BOOK", EndPointUrl, LinguaVersion, region);
+    Trace.TraceInformation("Request: {0}", requestUrl);
+
+    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(requestUrl);
+    HttpWebResponse response = null;
+    try
+    {
+        response = (HttpWebResponse)request.GetResponse();
+
+        using (Stream stream = response.GetResponseStream())
+        {
+            using (StreamWriter writer = new StreamWriter(snapshotFilePath))
+            {
+                byte[] buffer = new byte[8 * 4096];
+                int len;
+                while ((len = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    writer.BaseStream.Write(buffer, 0, len);
+                }
+            }
+        }
+    }
+    finally
+    {
+        response?.Dispose(); // Dispose of the HttpWebResponse object
+    }
+
+    Trace.TraceInformation("Snapshot saved to {0}", snapshotFilePath);
+}
