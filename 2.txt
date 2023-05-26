@@ -1,3 +1,7 @@
+tringBuilder requestUrlBuilder = new StringBuilder();
+requestUrlBuilder.AppendFormat("{0}/{1}/snapshot/{2}?entityType=BOOK", EndPointUrl, LinguaVersion, region);
+string requestUrl = requestUrlBuilder.ToString();
+
 using (HttpClient client = new HttpClient())
 {
     HttpResponseMessage response = await client.GetAsync(requestUrl);
