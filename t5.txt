@@ -1,0 +1,89 @@
+namespace Orator.ClientLib.InfrastructureLayer
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.IO;
+    using System.Net;
+    using System.Net.Http;
+    using System.Text;
+    using System.Threading.Tasks;
+    using System.Xml;
+
+    using Orator.ClientLib.Common;
+    using Orator.ClientLib.Common.BusinessStructure;
+
+    public abstract class OratorRESTServiceBase
+    {
+        public OratorRESTServiceBase()
+        {
+            Timeout = TimeSpan.FromMinutes(1);
+        }
+
+        public TimeSpan Timeout { get; set; }
+
+        protected string EndPointUrl { get; set; }
+
+        protected string AuthenticationHeader { get; set; }
+
+        public void SetAuthenticationToken(string webSSOToken)
+        {
+            AuthenticationHeader = "X-SSO-AuthToken:" + webSSOToken;
+        }
+
+        protected async Task<IEnumerable<OratorMessage>> GetMessagesAsync(string requestUrl)
+        {
+            Trace.TraceInformation("Request: {0}", requestUrl);
+            var results = new List<OratorMessage>();
+
+            using (var response = await GetResponseAsync(requestUrl))
+            using (var stream = response.GetResponseStream())
+            using (var xmlReader = XmlReader.Create(stream))
+            {
+                Trace.TraceInformation("Length of response: {0}", response.ContentLength);
+                while (xmlReader.Read())
+                {
+                    if (xmlReader.NodeType == XmlNodeType.Element && xmlReader.Name == "OratorMessage")
+                    {
+                        var msg = OratorSerializer.DeserializeMessage(xmlReader);
+                        results.Add(msg);
+                    }
+                }
+            }
+
+            Trace.TraceInformation("Response contained {0} messages", results.Count);
+            return results;
+        }
+
+        protected async Task<BusinessStructureInventory> GetInventoryAsync(string requestUrl)
+        {
+            Trace.TraceInformation("Request: {0}", requestUrl);
+            BusinessStructureInventory result = null;
+
+            using (var response = await GetResponseAsync(requestUrl))
+            using (var stream = response.GetResponseStream())
+            using (var xmlReader = XmlReader.Create(stream))
+            {
+                result = OratorSerializer.DeserializeInventory(xmlReader);
+            }
+
+            return result;
+        }
+
+        protected async Task<WebResponse> GetResponseAsync(string requestUrl)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                httpClient.Timeout = Timeout;
+
+                if (!string.IsNullOrEmpty(AuthenticationHeader))
+                {
+                    httpClient.DefaultRequestHeaders.Add("X-SSO-AuthToken", AuthenticationHeader);
+                }
+
+                HttpResponseMessage response = await httpClient.GetAsync(requestUrl);
+                return response.EnsureSuccessStatusCode();
+            }
+        }
+    }
+}
