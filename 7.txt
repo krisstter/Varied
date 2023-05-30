@@ -1,0 +1,18 @@
+function Copy-MultipleItems {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string[]]$SourcePaths,
+        
+        [Parameter(Mandatory = $true)]
+        [string[]]$DestinationPaths
+    )
+
+    # Iterate over the source and destination paths
+    for ($i = 0; $i -lt $SourcePaths.Count; $i++) {
+        $source = $SourcePaths[$i]
+        $destination = $DestinationPaths[$i]
+
+        # Copy the items from source to destination
+        Copy-Item -Path $source -Destination $destination -Recurse
+    }
+}
