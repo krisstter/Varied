@@ -1,0 +1,2 @@
+git config --global credential.helper "store --file ~/.git-credentials"
+git credential-store --file ~/.git-credentials store protocol=https host=github.com username=<your-username> password=<access-token>
