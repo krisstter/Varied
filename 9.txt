@@ -17,26 +17,33 @@ namespace UBS.Broil.Credit.TradeOverviewData
         public TrancheMappings GetTrancheMappings()
         {
             TrancheMappings trancheMappings = new TrancheMappings();
+            OracleConnection conn = null;
             try
             {
-                using (OracleConnection conn = new OracleConnection(ConnString))
-                {
-                    conn.Open();
-                    OracleCommand command = conn.CreateCommand();
-                    command.CommandType = CommandType.Text;
-                    command.CommandText = MyConfig.TrancheQuery;
-                    OracleDataAdapter adapter = new OracleDataAdapter(command);
-                    DataSet ds = new DsTranche();
-                    ds.Tables[0].Rows.Clear();
-                    adapter.TableMappings.Add("Table", ds.Tables[0].TableName);
-                    adapter.Fill(ds);
+                conn = new OracleConnection(ConnString);
+                conn.Open();
+                OracleCommand command = conn.CreateCommand();
+                command.CommandType = CommandType.Text;
+                command.CommandText = MyConfig.TrancheQuery;
+                OracleDataAdapter adapter = new OracleDataAdapter(command);
+                DataSet ds = new DsTranche();
+                ds.Tables[0].Rows.Clear();
+                adapter.TableMappings.Add("Table", ds.Tables[0].TableName);
+                adapter.Fill(ds);
 
-                    trancheMappings = FillTrancheMappings(ds as DsTranche);
-                }
+                trancheMappings = FillTrancheMappings(ds as DsTranche);
             }
             catch (Exception ex)
             {
                 throw new Exception("Failed retrieving tranche details from FCDM", ex);
+            }
+            finally
+            {
+                if (conn != null)
+                {
+                    conn.Close();
+                    conn.Dispose();
+                }
             }
 
             return trancheMappings;
