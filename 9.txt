@@ -1,0 +1,81 @@
+using System;
+using System.Data;
+using Oracle.ManagedDataAccess.Client;
+using UBS.Broil.Credit.ConfigManager;
+using UBS.Broil.Credit.FFETypes;
+using UBS.Broil.Credit.TradeOverviewData.Dataset;
+
+namespace UBS.Broil.Credit.TradeOverviewData
+{
+    public class FCDMTrancheData : DataProvider
+    {
+        public FCDMTrancheData(Config cfg, string connString)
+            : base(cfg, connString)
+        {
+        }
+
+        public TrancheMappings GetTrancheMappings()
+        {
+            TrancheMappings trancheMappings = new TrancheMappings();
+            try
+            {
+                using (OracleConnection conn = new OracleConnection(ConnString))
+                {
+                    conn.Open();
+                    OracleCommand command = conn.CreateCommand();
+                    command.CommandType = CommandType.Text;
+                    command.CommandText = MyConfig.TrancheQuery;
+                    OracleDataAdapter adapter = new OracleDataAdapter(command);
+                    DataSet ds = new DsTranche();
+                    ds.Tables[0].Rows.Clear();
+                    adapter.TableMappings.Add("Table", ds.Tables[0].TableName);
+                    adapter.Fill(ds);
+
+                    trancheMappings = FillTrancheMappings(ds as DsTranche);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed retrieving tranche details from FCDM", ex);
+            }
+
+            return trancheMappings;
+        }
+
+        private TrancheMappings FillTrancheMappings(DsTranche ds)
+        {
+            TrancheMappings trancheMappings = new TrancheMappings();
+
+            if (ds == null || ds._DsTranche == null)
+                throw new ArgumentNullException("DsTranche");
+
+            DsTranche.DsTrancheRow row;
+            TrancheMapping trancheMapping;
+            for (int index = 0; index < ds._DsTranche.Rows.Count; index++)
+            {
+                row = (DsTranche.DsTrancheRow)ds._DsTranche.Rows[index];
+                trancheMapping = new TrancheMapping();
+                PopulateTrancheMapping(ref trancheMapping, row);
+                trancheMappings.TrancheMappingList.Add(trancheMapping);
+            }
+
+            return trancheMappings;
+        }
+
+        private void PopulateTrancheMapping(ref TrancheMapping trancheMapping, DsTranche.DsTrancheRow row)
+        {
+            string attach = string.Empty;
+            string detach = string.Empty;
+            if (!row.IsCURVE_NAMENull())
+                trancheMapping.TrancheName = row.CURVE_NAME;
+
+            if (!row.IsATTACHNull())
+                attach = row.ATTACH;
+
+            if (!row.IsDETACHNull())
+                detach = row.DETACH;
+
+            trancheMapping.Tranche = string.Format("{0}-{1}", attach, detach);
+        }
+    }
+}
