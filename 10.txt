@@ -1,0 +1,197 @@
+using Oracle.ManagedDataAccess.Client;
+using Oracle.ManagedDataAccess.Types;
+using System;
+using System.Data;
+using System.Diagnostics;
+using System.Net;
+using System.Xml;
+
+namespace UBS.Broil.Credit.DbAccess
+{
+    internal class BroilODP : BroilDbProvider, IDbProvider
+    {
+        private string _databaseName = string.Empty;
+
+        public IDbConnection Connect(string environment) => this.DirectConnect(this.GetConnectionString((NetworkCredential)null, environment));
+
+        public IDbConnection Connect(EnvironmentType envType) => this.DirectConnect(this.GetConnectionString((NetworkCredential)null, envType));
+
+        public IDbConnection Connect(NetworkCredential cred, string environment) => this.DirectConnect(this.GetConnectionString(cred, environment));
+
+        public IDbConnection Connect(NetworkCredential cred, EnvironmentType envType) => this.DirectConnect(this.GetConnectionString(cred, envType));
+
+        public IDbConnection Connect(NetworkCredential cred, DatabaseEnvironment env) => this.DirectConnect(this.GetConnectionString(cred, env));
+
+        public IDbConnection DirectConnect(string connectionString)
+        {
+            IDbConnection dbConnection = new OracleConnection(connectionString);
+            try
+            {
+                ((OracleConnection)dbConnection).StateChange += new StateChangeEventHandler(BroilODP.OnConnectionChanged);
+                dbConnection.Open();
+                this._databaseName = ((OracleConnection)dbConnection).DataSource;
+            }
+            catch (OracleException ex)
+            {
+                Trace.WriteLine(string.Format("({0:u}) {1}", DateTime.Now, ex.Message), "dberror");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(string.Format("({0:u}) {1}", DateTime.Now, ex.Message), "error");
+                dbConnection.Close();
+                throw;
+            }
+            return dbConnection;
+        }
+
+        public override string GetProviderName() => "Oracle.ManagedDataAccess";
+
+        protected override string GetConnectionFormat() => "{0};User Id={1};Password={2}";
+
+        private static void OnConnectionChanged(object sender, StateChangeEventArgs e)
+        {
+        }
+
+        public IDataParameter CreateParameter(string paramName, DbType dataType, object val)
+        {
+            if (dataType == DbType.String && val != null)
+                val = val.ToString().Trim();
+            return new OracleParameter(paramName, BroilODP.GetOracleType(dataType), val, ParameterDirection.Input);
+        }
+
+        public IDataParameter CreateParameter(string paramName, DbType dataType, object val, ParameterDirection dir)
+        {
+            if (dataType == DbType.String && val != null)
+                val = val.ToString().Trim();
+            return new OracleParameter(paramName, BroilODP.GetOracleType(dataType), val, dir);
+        }
+
+        public IDataParameter CreateParameter(string paramName, DbType dataType, int size, object val, ParameterDirection dir)
+        {
+            if (dataType == DbType.String && val != null)
+                val = val.ToString().Trim();
+            return new OracleParameter(paramName, BroilODP.GetOracleType(dataType), size, val, dir);
+        }
+
+        public IDataParameter CreateParameter(IDbConnection conn, string paramName, char[] val, ParameterDirection dir)
+        {
+            OracleClob oracleClob = new OracleClob((OracleConnection)conn);
+            if (val == null)
+                return new OracleParameter(paramName, OracleDbType.Clob, dir);
+            oracleClob.Write(val, 0, val.Length);
+            return new OracleParameter(paramName, OracleDbType.Clob, oracleClob, dir);
+        }
+
+        public IDataParameter CreateArrayParameter(string paramName, DbType dataType, Array array)
+        {
+            int[] numArray = null;
+            OracleParameter arrayParameter;
+            if (dataType == DbType.String)
+            {
+                arrayParameter = new OracleParameter(paramName, OracleDbType.Varchar2, ParameterDirection.Input);
+                if (array != null && array.Length > 0)
+                {
+                    numArray = new int[array.Length];
+                    for (int index = 0; index < array.Length; ++index)
+                        numArray[index] = array.GetValue(index) != null ? ((string)array.GetValue(index)).Length : 0;
+                }
+            }
+            else
+                arrayParameter = new OracleParameter(paramName, BroilODP.GetOracleType(dataType), ParameterDirection.Input);
+            arrayParameter.CollectionType = OracleCollectionType.PLSQLAssociativeArray;
+            if (array != null && array.Length > 0)
+            {
+                arrayParameter.Value = array;
+                arrayParameter.Size = array.Length;
+                arrayParameter.ArrayBindSize = numArray;
+            }
+            else
+            {
+                arrayParameter.Value = new string[1] { string.Empty };
+                arrayParameter.Size = 1;
+                arrayParameter.ArrayBindSize = new int[1];
+            }
+            return arrayParameter;
+        }
+
+        public IDataParameter CreateXmlParameter(string paramName, IDbConnection conn, XmlDocument xml)
+        {
+            OracleXmlType oracleXmlType = new OracleXmlType((OracleConnection)conn, xml);
+            return new OracleParameter(paramName, OracleDbType.XmlType, oracleXmlType, ParameterDirection.Input);
+        }
+
+        public string GetDatabaseName() => this._databaseName;
+
+        public IDbCommand CreateCommand(IDbConnection conn) => conn.CreateCommand();
+
+        public IDbCommand CreateCommand(IDbConnection conn, int size) => new OracleCommand()
+        {
+            Connection = (OracleConnection)conn,
+            ArrayBindCount = size
+        };
+
+        private static OracleDbType GetOracleType(DbType t)
+        {
+            switch (t)
+            {
+                case DbType.AnsiString:
+                case DbType.String:
+                case DbType.AnsiStringFixedLength:
+                case DbType.StringFixedLength:
+                    return OracleDbType.Varchar2;
+                case DbType.Binary:
+                    return OracleDbType.Blob;
+                case DbType.Boolean:
+                    return OracleDbType.Char;
+                case DbType.Currency:
+                case DbType.Decimal:
+                    return OracleDbType.Decimal;
+                case DbType.Date:
+                    return OracleDbType.Date;
+                case DbType.DateTime:
+                    return OracleDbType.TimeStamp;
+                case DbType.Double:
+                    return OracleDbType.Double;
+                case DbType.Int16:
+                    return OracleDbType.Int16;
+                case DbType.Int32:
+                    return OracleDbType.Int32;
+                case DbType.Int64:
+                    return OracleDbType.Int64;
+                case DbType.Object:
+                    return OracleDbType.RefCursor;
+                case DbType.SByte:
+                    return OracleDbType.Char;
+                case DbType.Single:
+                    return OracleDbType.Single;
+                default:
+                    return OracleDbType.Varchar2;
+            }
+        }
+
+        public void PrepareResultSet(IDbCommand cmd, ResultSetType rst)
+        {
+            switch (rst)
+            {
+                case ResultSetType.outparam:
+                    cmd.Parameters.Add(new OracleParameter("cur_result", OracleDbType.RefCursor, DBNull.Value, ParameterDirection.Output));
+                    break;
+                case ResultSetType.intoutparam:
+                    cmd.Parameters.Add(new OracleParameter("cur_result", OracleDbType.RefCursor, DBNull.Value, ParameterDirection.InputOutput));
+                    break;
+                case ResultSetType.result:
+                    cmd.Parameters.Add(new OracleParameter("cur_result", OracleDbType.RefCursor, DBNull.Value, ParameterDirection.ReturnValue));
+                    break;
+            }
+        }
+
+        public IDataAdapter CreateAdapter(IDbCommand cmd) => new OracleDataAdapter((OracleCommand)cmd);
+
+        public int GetIntValue(IDataParameter param) => param.Value == null || param.Value is DBNull ? -1 : ((OracleDecimal)param.Value).ToInt32();
+
+        public string GetStringValue(IDataParameter param) => param.Value == null || param.Value is DBNull ? string.Empty : param.Value.ToString();
+
+        public void Dispose() => GC.SuppressFinalize(this);
+    }
+}
