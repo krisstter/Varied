@@ -1,0 +1,168 @@
+[CmdletBinding()]
+param(
+    [Parameter(Position=0, Mandatory=$true)] $paramHash
+)
+
+$Err = 0;
+$curveString = $paramHash.Get_Item("CurvesList")
+$env = $paramHash.Get_Item("env").ToUpper()
+$business = $paramHash.Get_Item("business").ToUpper()
+$ora_db = $paramHash.Get_Item("ora_db")
+$ora_db_user = $paramHash.Get_Item("ora_db_user")
+$ora_db_pwd = $paramHash.Get_Item("ora_db_pwd")
+$region = $paramHash.Get_Item("region")
+$emailTo = $paramHash.Get_Item("emailTo")
+$emailFrom = $paramHash.Get_Item("emailFrom")
+$shortName = $paramHash.Get_Item("shortName").ToUpper()
+$CurvesList = $curveString.replace("\","/").split(",")
+$EODCache = $paramHash.Get_Item("EODCache")
+$RTCache = $paramHash.Get_Item("RTCache")
+$Query = "select OBJECT_KEY,EXTERNAL_VERSION from CURVE_INSTANCE where object_key in ([%param%]) and part_key = 1"
+
+function JoinParam($paramArr){
+    $i = 0
+	$StringBuilder = "";
+	foreach($singleParam in $paramArr)
+	{
+        if($i -gt 0){
+		    $stringBuilder += ",'" + $singleParam + "'"
+        }
+        else{
+            $stringBuilder += "'" + $singleParam + "'"
+        }
+
+        $i++
+	}
+	return $StringBuilder
+}
+
+function QueryDb($query, $paramArr)
+{
+	$tableT = @{}
+	try{
+		$oraConn = New-Object Oracle.ManagedDataAccess.Client.OracleConnection("Data Source=$ora_db;User Id=$ora_db_user;Password=$ora_db_pwd;")
+		$oraConn.Open()
+		$avc = JoinParam($paramArr)
+		$local_query = $query.replace("[%param%]", $avc)
+		$STMcommandTC = New-Object Oracle.ManagedDataAccess.Client.OracleCommand($local_query, $oraConn)
+		$STMreaderTC = $STMcommandTC.ExecuteReader()
+		while ($STMreaderTC.Read())
+		{
+			$tableT.Set_Item($STMreaderTC.GetValue(0).ToString(), $STMreaderTC.GetValue(1).ToString())
+		}
+		$oraConn.Close()
+	}
+	catch {
+		$Errors.Add($_.Exception.Message)
+		Write-Host $_.Exception.Message
+		$Err++
+	}
+	return $tableT
+}
+
+function QueryCache($EODurl, $RTurl, $curveObj, $region, $eventDate){
+	$EODVer = $null
+	$RTVer = $null
+
+	$RTVersionQuery = "http://$RTCache:8086/mds/frisk/cache/Curve/object?id=$curveObj"
+	$EODVersionQuery = "http://$EODCache:8086/mds/eod/cache/Curve/object?id=$curveObj"
+
+	try {
+		$toReturn = @{}
+		$rtCurveObj = [xml]($wc.downloadString($RTVersionQuery))
+		$eodCurveObj = [xml]($wc.downloadString($EODVersionQuery))
+		write-host $EODVersionQuery
+		$RTVer = $rtCurveObj.CreditCurve.externalVersion
+		$EODVer = $eodCurveObj.CreditCurve.externalVersion
+	}
+	catch {
+		$Errors.Add($_.Exception.Message)
+		$Errors.Add("http://$RTCache:8086/mds/eod/cache/Curve/object?id=$curveObj")
+		$Errors.Add("http://$EODCache:8086/mds/eod/cache/Curve/object?id=$curveObj")
+	}
+	return @{"EODVer" = $EODVer; "RTVer" = $RTVer}
+}
+
+##### Script main 
+$eventDate = ((Get-Date).AddHours(-6)).ToString("yyyy-MM-dd")
+$resultsHash = @{}
+$oraConn = New-Object Oracle.ManagedDataAccess.Client.OracleConnection("Data Source=$ora_db;User Id=$ora_db_user;Password=$ora_db_pwd;")
+$Output = New-Object System.Collections.ArrayList
+$Errors = New-Object System.Collections.ArrayList
+$wc = New-Object system.Net.WebClient
+$wc.UseDefaultCredentials = $true
+
+try{
+	$CurvesDbTable = QueryDb $Query $CurvesList
+	if($CurvesDbTable[1].Count -gt 0){
+		foreach ($row in $CurvesDbTable[1].Keys){
+			[string] $CurveObj = $row
+			[string] $CurveVer = $CurvesDbTable[1][$row]
+			$CacheResults = QueryCache $EODurl $RTurl $CurveObj $region $eventDate
+			if(($CurveVer -eq $CacheResults["EODVer"]) -and ($CurveVer -eq $CacheResults["RTVer"])){
+				$Output.Add($CurveObj + " synced:" + "DB: " + $CurveVer + " RT: " + $CacheResults["RTVer"] + " EOD: " + $CacheResults["EODVer"])
+			} else {
+				$Err++;
+				$Errors.Add($CurveObj + " not synced:" + "DB: " + $CurveVer + " RT: " + $CacheResults["RTVer"] + " EOD: " + $CacheResults["EODVer"])
+			}
+		}
+	}	else {
+		$Err++;
+		$paramB = JoinParam($CurvesList)
+		$qq = $Query.replace("[%param%]", $paramB)
+		$Errors.Add("`nNo curves returned by Oracle query: " + $Query.replace("[%param%]", $paramB))
+	}
+}
+catch{
+	$Errors.Add($_.Exception.Message)
+	Write-Host $_.Exception.Message
+	$Err++;
+}
+finally{
+	# create results hash to send back to wrapper 
+	$resultsHash = @{}           
+	#Generate the XML to record all the details
+	$resultXML = '<ScheduledTask>'
+	$resultXML = $resultXML + "
+		<Error>
+			$XMLError
+		</Error>
+		<Details>
+			$XmlDetails
+		</Details>									
+	"
+	$resultXML = $resultXML + '</ScheduledTask>' 
+	$resultsHash.Set_Item("scriptName", "DB vs Cache Curves checks")     
+	$resultsHash.Set_Item("resultXML", $resultXML)              
+	$emailPriority = "High"
+	#Log details
+	$resultsHash.Set_Item("logData", $logDataArray)              
+	$resultsHash.Set_Item("errorData", $errorDataArray)           
+	$resultsHash.Set_Item("errorData", $Errors) 
+	$resultsHash.Set_Item("logData", $Output)
+	if($Err -gt 0){
+		$successfail = "FAIL"
+		$resultsHash.Set_Item("containsErrors", $True)	
+		$emailPriority = "High"
+		$mname = hostname
+		$business = $business.ToUpper()
+		$env = $env.ToUpper()
+		$shortName = $shortName.ToUpper()
+		$emailSubject = "Automated Process | $business-$env | $shortName | $successfail"       
+		$emailBody = "This automated process is running on $mname `n`n" 
+		$emailBody += "Log file : $LogFileName `n`n"
+		$emailBody += "Script file: $scriptFile`n`n"        
+		foreach($tmpErrMsg in $Errors){
+			$emailBodyData += "$tmpErrMsg`n`n"
+		}		            
+		$emailBody += $emailBodyData
+		$emailAttach = "NA"
+		$resultsHash.Set_Item("emailTo", $emailTo)       
+		$resultsHash.Set_Item("emailFrom", $emailFrom)       
+		$resultsHash.Set_Item("emailSubject", $emailSubject)       
+		$resultsHash.Set_Item("emailbody", $emailBody)       
+		$resultsHash.Set_Item("emailPriority", $emailPriority)       
+		$resultsHash.Set_Item("emailAttach", $emailAttach) 
+	}
+}
+return $resultsHash
