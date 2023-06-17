@@ -1,0 +1,213 @@
+[CmdletBinding()]
+param (
+    [Parameter(Position = 0, Mandatory = $true)]
+    $paramHash
+)
+
+$logDataArray = New-Object System.Collections.ArrayList
+$errorDataArray = New-Object System.Collections.ArrayList
+
+$ora_db = $paramHash.Get_Item("ora_db")
+$ora_db_user = $paramHash.Get_Item("ora_db_user")
+$ora_db_pwd = $paramHash.Get_Item("ora_db_pwd")
+$region = $paramHash.Get_Item("region")
+$labelType = $paramHash.Get_Item("labelType")
+$emailTo = $paramHash.Get_Item("emailTo")
+$emailFrom = $paramHash.Get_Item("emailFrom")
+$userEmailTo = $paramHash.Get_Item("userEmailTo")
+$userEmailFrom = $paramHash.Get_Item("userEmailFrom")
+$region = $region.ToUpper()
+
+$strSysDate = "sysdate"
+
+if ($labelType -eq "ROLL") {
+    if ($region -eq "AMER") {
+        $strSysDate = "sysdate - 1"
+    }
+
+    $queryString = "     and label_dt = trunc($strSysDate) + 1`n"
+    $queryString += "     and label_type = 'RollEvent'`n"
+} elseif ($labelType -eq "EOD") {
+    if ((Get-Date).Hour -eq 0) {
+        $strSysDate = "sysdate - 1"
+    }
+
+    $queryString = "     and label_dt = trunc($strSysDate)`n"
+    $queryString += "     and label_type = 'EndOfDayEvent'`n"
+}
+
+if ($business -eq "credit") {
+    $schema = "credit_dbo"
+} elseif ($business -eq "rates") {
+    $schema = "rates_dbo"
+}
+
+$query = @"
+SELECT
+     to_char(trunc(el.label_dt), 'mm/dd/yyyy') label_dt,
+     el.label_type,
+     el.business_center,
+     el.label_name,
+     el.process_status,
+     to_char(trunc(el.create_ts), 'mm/dd/yyyy') creation_dt,
+     to_char(el.create_ts, 'hh24:mi:ss') start_time,
+     to_char(el.update_ts, 'hh24:mi:ss') end_time
+FROM
+    $schema.epoch_label el
+WHERE
+     business_center = '$region'
+"@
+
+$query += $queryString
+$query += "ORDER BY label_dt, creation_dt, start_time`n"
+
+$logDataArray.Add("Query:")
+$query.split("`n") | ForEach-Object {
+    $logDataArray.Add($_)
+}
+
+Add-Type -Path "C:\path\to\Oracle.ManagedDataAccess.dll"
+
+$oraConn = New-Object Oracle.ManagedDataAccess.Client.OracleConnection("Data Source=$ora_db;User Id=$ora_db_user;Password=$ora_db_pwd;")
+$set = New-Object System.Data.DataSet
+$table = $set.Tables[0]
+
+try {
+    $oraConn.Open()
+
+    [string] $successfail = "SUCCESS"
+
+    $table = New-Object System.Data.DataTable
+    $adapter = New-Object Oracle.ManagedDataAccess.Client.OracleDataAdapter($query, $oraConn)
+    $adapter.Fill($table)
+    [int] $rowCount = $table.Rows.Count
+
+    if ($rowCount -eq 0) {
+        $successfail = "FAIL"
+        $emailBodyData = "No data found`n`n"
+        $logDataArray.Add("")
+        $logDataArray.Add("Results:")
+        $logDataArray.Add("No data found")
+    } else {
+        foreach ($row in $table.Rows) {
+            [string] $labelDt = $row[0].toString()
+            [string] $labelName = $row[3].toString()
+            [string] $status = $row[4].toString()
+            [string] $startTime = $row[6].toString()
+            [string] $endTime = $row[7].toString()
+
+            $emailBodyData = "Label Date: $labelDt`n"
+            $emailBodyData += "Label Name: $labelName`n"
+            $emailBodyData += "Status: $status`n"
+            $emailBodyData += "Start Time: $startTime`n"
+            $emailBodyData += "End Time: $endTime`n"
+
+            $logDataArray.Add("")
+            $logDataArray.Add("Results:")
+            $emailBodyData.split("`n") | ForEach-Object {
+                $logDataArray.Add($_)
+            }
+
+            $XmlDetails += "<LabelDate><![CDATA[$labelDt]]></LabelDate>"
+            $XmlDetails += "<LabelName><![CDATA[$labelName]]></LabelName>"
+            $XmlDetails += "<Status><![CDATA[$status]]></Status>"
+            $XmlDetails += "<StartTime><![CDATA[$startTime]]></StartTime>"
+            $XmlDetails += "<EndTime><![CDATA[$endTime]]></EndTime>"
+        }
+    }
+} catch {
+    $successfail = "FAIL"
+    $errMessage1 = "$($_.Exception.Message)"
+    $errMessage2 = $_.InvocationInfo.PositionMessage
+    $errorDataArray.Add($errMessage1)
+    $errorDataArray.Add($errMessage2)
+    $XMLError += "<error><![CDATA[$errMessage1]]></error>"
+    $XMLError += "<error><![CDATA[$errMessage2]]></error>"
+} finally {
+    $oraConn.Close()
+
+    # create email info
+    if ($successfail -eq "FAIL") {
+        $emailPriority = "High"
+    } else {
+        $emailPriority = "Normal"
+    }
+    $mname = hostname
+    $business = $business.ToUpper()
+    $env = $env.ToUpper()
+    $labelType = $labelType.ToUpper()
+
+    $emailSubject = "Automated Check | $business-$env | $region $labelType Label"
+
+    if ($successfail -eq "FAIL") {
+        $emailSubject += " | NOT PROCESSING"
+        $emailBodyData = "`nThe $region $labelType Label has not started - please investigate."
+        $XMLError += "<message>The $region $labelType Label has not started - please investigate.</message>"
+        $errorDataArray.Add("The $region $labelType Label has not started - please investigate.")
+    } else {
+        $emailSubject += " | $status"
+    }
+
+    $emailBody = "This automated process is running on $mname `n`n"
+    $emailBody += "Log file : $LogFileName `n`n"
+    $emailBody += "Script file: $scriptFile`n`n"
+
+    if ($successfail -eq "FAIL") {
+        $emailBodyData += "$errMessage1`n`n"
+        $emailBodyData += "$errMessage2`n`n"
+    }
+    $emailBody += $emailBodyData
+
+    $emailAttach = "NA"
+
+    # create results hash to send back to wrapper
+    $resultsHash = @{}
+
+    # Insert into results hash table
+    $resultsHash.Set_Item("emailTo", $emailTo);
+    $resultsHash.Set_Item("emailFrom", $emailFrom);
+    $resultsHash.Set_Item("emailSubject", $emailSubject);
+    $resultsHash.Set_Item("emailBody", $emailBody);
+    $resultsHash.Set_Item("emailPriority", $emailPriority);
+    $resultsHash.Set_Item("emailAttach", $emailAttach);
+
+    # Replicate for user email
+    $resultsHash.Set_Item("userEmailTo", $userEmailTo);
+    $resultsHash.Set_Item("userEmailFrom", $userEmailFrom);
+    $resultsHash.Set_Item("userEmailSubject", $emailSubject);
+    $resultsHash.Set_Item("useremailBody", $emailBody);
+    $resultsHash.Set_Item("userEmailPriority", $emailPriority);
+    $resultsHash.Set_Item("userEmailAttach", $emailAttach);
+
+    # for fRiskSupport DB
+    if ($successfail -eq "FAIL") {
+        $containsErrors = $True
+    } else {
+        $containsErrors = $False
+    }
+
+    # Generate the XML to record all the details
+    $resultXML = '<ScheduledTask>'
+    $resultXML = $resultXML + "
+          <Label region='$Region' type='$LabelType'>
+               <status>$status</status>
+          </Label>
+          <Error>
+               $XMLError
+          </Error>
+          <Details>
+               $XmlDetails
+          </Details>
+     "
+    $resultXML = $resultXML + '</ScheduledTask>'
+
+    $resultsHash.Set_Item("containsErrors", $containsErrors)
+    $resultsHash.Set_Item("scriptName", "Label Check")
+    $resultsHash.Set_Item("resultXML", $resultXML)
+
+    # Log details
+    $resultsHash.Set_Item("logData", $logDataArray)
+    $resultsHash.Set_Item("errorData", $errorDataArray)
+}
+
+return $resultsHash
