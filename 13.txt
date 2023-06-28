@@ -1,0 +1,37 @@
+# Read the file content
+$content = Get-Content -Path "path_to_your_file.txt"
+
+# Define the strings to match
+$matchStrings = @("string_to_match1", "string_to_match2", "string_to_match3")
+
+# Filter the content and remove lines with matching strings
+$filteredContent = $content | Where-Object { $line = $_; $matchStrings | ForEach-Object { $line -notlike "*$_*" } }
+
+# Set the path for the new file
+$newFilePath = "path_to_new_file.txt"
+
+# Write the filtered content to the new file
+$filteredContent | Set-Content -Path $newFilePath
+
+
+$file = "C:\path\to\file.txt"
+$attributes = (Get-Item $file).Attributes
+
+if ($attributes -band [System.IO.FileAttributes]::ReadOnly) {
+    Write-Host "The file is Read-only."
+} else {
+    Write-Host "The file is not Read-only."
+}
+
+
+$file = "C:\path\to\file.txt"
+$attributes = (Get-Item $file).Attributes
+
+if ($attributes -band [System.IO.FileAttributes]::ReadOnly) {
+    # Remove the Read-only attribute
+    $newAttributes = $attributes -bxor [System.IO.FileAttributes]::ReadOnly
+    Set-ItemProperty -Path $file -Name Attributes -Value $newAttributes
+    Write-Host "The Read-only attribute has been removed from the file."
+} else {
+    Write-Host "The file is not Read-only."
+}
