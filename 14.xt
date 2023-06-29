@@ -1,0 +1,17 @@
+$fileContent = Get-Content -Path "path/to/file.txt" -Raw
+
+$patterns = @(
+    "pattern1",
+    "pattern2",
+    "pattern3"
+)
+
+$matches = foreach ($pattern in $patterns) {
+    Select-String -InputObject $fileContent -Pattern $pattern -AllMatches
+}
+
+foreach ($match in $matches) {
+    $pattern = $match.Pattern
+    $matchCount = $match.Matches.Count
+    Write-Host "Pattern '$pattern' found $matchCount times in the file."
+}
