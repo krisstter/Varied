@@ -57,20 +57,22 @@ function Search-PatternInFile {
     $file = "C:\path\to\file.txt"
 
     # Use Select-String to search for the pattern in the file
-    $matches = Get-Content $file | Select-String -Pattern $pattern
+    $matchingLines = Get-Content $file | Select-String -Pattern $pattern
 
     $result = @{}
 
     # Count the occurrences of each match
-    foreach ($match in $matches.Matches) {
-        if ($result.ContainsKey($match.Value)) {
-            $result[$match.Value] += 1
+    foreach ($line in $matchingLines) {
+        $match = $line.Matches.Value
+
+        if ($result.ContainsKey($match)) {
+            $result[$match] += 1
         } else {
-            $result[$match.Value] = 1
+            $result[$match] = 1
         }
     }
 
-    $totalCount = $matches.Count
+    $totalCount = $matchingLines.Count
 
     # Return a hashtable containing the matches and counts
     return @{
@@ -91,4 +93,3 @@ foreach ($match in $result.Matches.Keys) {
 # Display the total summary count
 $totalCount = $result.TotalCount
 Write-Output "Total Summary Count: $totalCount"
-
