@@ -63,12 +63,14 @@ function Search-PatternInFile {
 
     # Count the occurrences of each match
     foreach ($line in $matchingLines) {
-        $match = $line.Matches.Value
+        foreach ($match in $line.Matches) {
+            $matchValue = $match.Value
 
-        if ($result.ContainsKey($match)) {
-            $result[$match] += 1
-        } else {
-            $result[$match] = 1
+            if ($result.ContainsKey($matchValue)) {
+                $result[$matchValue] += 1
+            } else {
+                $result[$matchValue] = 1
+            }
         }
     }
 
@@ -93,3 +95,4 @@ foreach ($match in $result.Matches.Keys) {
 # Display the total summary count
 $totalCount = $result.TotalCount
 Write-Output "Total Summary Count: $totalCount"
+
