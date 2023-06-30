@@ -51,3 +51,44 @@ foreach ($pattern in $patterns) {
 $customObject = $patternCounts | ForEach-Object { [PSCustomObject]@{ Pattern = $_.Key; Count = $_.Value } }
 
 $customObject
+
+function Search-PatternInFile {
+    $pattern = "apple|banana|orange"
+    $file = "C:\path\to\file.txt"
+
+    # Use Select-String to search for the pattern in the file
+    $matches = Get-Content $file | Select-String -Pattern $pattern
+
+    $result = @{}
+
+    # Count the occurrences of each match
+    foreach ($match in $matches.Matches) {
+        if ($result.ContainsKey($match.Value)) {
+            $result[$match.Value] += 1
+        } else {
+            $result[$match.Value] = 1
+        }
+    }
+
+    $totalCount = $matches.Count
+
+    # Return a hashtable containing the matches and counts
+    return @{
+        Matches = $result
+        TotalCount = $totalCount
+    }
+}
+
+# Call the function and store the result in a variable
+$result = Search-PatternInFile
+
+# Display the matches and counts
+foreach ($match in $result.Matches.Keys) {
+    $count = $result.Matches[$match]
+    Write-Output "Match: $match Count: $count"
+}
+
+# Display the total summary count
+$totalCount = $result.TotalCount
+Write-Output "Total Summary Count: $totalCount"
+
