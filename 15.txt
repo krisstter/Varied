@@ -1,0 +1,21 @@
+# Replace these with appropriate values
+$sourceFolderPath = "C:\Path\To\Local\Files"
+$destinationFolderPath = "D:\Path\To\Remote\Destination"
+$remoteComputerName = "RemoteComputerName"
+
+# Establish a remote session to the target computer
+$session = New-PSSession -ComputerName $remoteComputerName
+
+# Check if the destination folder exists on the remote computer, and create it if it doesn't
+if (-not (Test-Path -Path $destinationFolderPath -PathType Container -Session $session)) {
+    Invoke-Command -Session $session -ScriptBlock {
+        param($folderPath)
+        New-Item -ItemType Directory -Path $folderPath | Out-Null
+    } -ArgumentList $destinationFolderPath
+}
+
+# Copy files from the local machine to the remote computer
+Copy-Item -Path "$sourceFolderPath\*" -Destination $destinationFolderPath -ToSession $session
+
+# Close the remote session
+Remove-PSSession $session
