@@ -1,0 +1,80 @@
+using System;
+
+namespace UbsDeployConfigTool
+{
+    partial class Program
+    {
+
+        static void Main(string[] args)
+        {
+            try
+            {
+                var action = args.Length > 0 ? args[0] : string.Empty;
+                var subParam = args.Length > 1 ? args[1] : string.Empty;
+
+                var httpClientFactory = new SimpleHttpClientFactory();
+
+                var rcasUrl = ConfigurationManager.AppSettings.Get("RcasUrl");
+                var appId = ConfigurationManager.AppSettings.Get("AppId");
+                var ssoUser = ConfigurationManager.AppSettings.Get("ssoUser");
+
+                Console.Write("Enter Password: ");
+                var password = ReadMaskedPassword();
+
+                var authenticator = new RcasAuthenticator(httpClientFactory,
+                    new Uri(rcasUrl),
+                    appId,
+                    ssoUser,
+                    password);
+
+                var debug = true;
+
+                var ubsDeployOrganisation = ConfigurationManager.AppSettings.Get("UbsDeployOrganisation");
+
+                var api = new Api(httpClientFactory, authenticator, ubsDeployOrganisation, debug);
+                var ubsDeployApi = new UbsDeployApi(authenticator, api, ubsDeployOrganisation);
+                var sync = new FriskToUbsDeployInstanceSync(ubsDeployApi);
+
+                switch (action.ToLowerInvariant())
+                {
+                    case "tags":
+                        sync.GetDeploymentTagToMachineDelta(string.IsNullOrEmpty(subParam) ? false : Convert.ToBoolean(subParam));
+                        break;
+                    case "components":
+                        sync.SyncManifestWithUbsD();
+                        break;
+                    case "componentsclean":
+                        sync.CleanUbsD();
+                        break;
+                    default: throw new NotImplementedException($"Action: {action} not supported");
+                }
+                sync.DeploymentTagToComponent();
+                Console.ReadKey();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                Console.ReadKey();
+            }
+
+        }
+
+        private static string ReadMaskedPassword()
+        {
+            string password = "";
+            ConsoleKeyInfo key;
+            do
+            {
+                key = Console.ReadKey(true);
+                // Ignore any key that is not a digit or control key (e.g., Enter)
+                if (!char.IsControl(key.KeyChar))
+                {
+                    password += key.KeyChar;
+                }
+                // Break the loop when Enter is pressed
+            } while (key.Key != ConsoleKey.Enter);
+            Console.WriteLine(); // Move to the next line after the loop ends
+            return password;
+        }
+    }
+}
