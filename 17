@@ -1,0 +1,54 @@
+using log4net;
+using System;
+
+namespace UBS.Broil.Credit.OBS.PrionWS
+{
+    internal class PrionModelTree : PrionModelTreeNode
+    {
+        private static readonly ILog log = LogManager.GetLogger(typeof(PrionModelTree));
+
+        private PrionModelTree() : base()
+        {
+            try
+            {
+                // Your existing initialization code
+                // ...
+
+                log.Info("PrionModelTree initialization succeeded.");
+            }
+            catch (Exception ex)
+            {
+                log.Error("PrionModelTree initialization failed.", ex);
+                throw; // Rethrow the exception to ensure it's not swallowed
+            }
+        }
+
+        public static PrionModelTree Instance
+        {
+            get
+            {
+                lock (lockInstance)
+                {
+                    try
+                    {
+                        if (instance == null || !instance.IsCurrent)
+                        {
+                            log.Debug("Creating or refreshing PrionModelTree instance.");
+                            instance = new PrionModelTree();
+                        }
+
+                        return instance;
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Error("Error while getting PrionModelTree instance.", ex);
+                        throw; // Rethrow the exception to ensure it's not swallowed
+                    }
+                }
+            }
+        }
+
+        // Other methods in your class
+        // ...
+    }
+}
