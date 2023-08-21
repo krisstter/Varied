@@ -33,7 +33,7 @@ public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity>
             // Remove last OR bit...
             if (queryBuilder.Length > 0)
             {
-                queryBuilder.Remove(queryBuilder.Length - 3, 3);
+                queryBuilder.Length -= 3; // Remove the last three characters
 
                 string resultType = "PERMPATH_OBJECT";
                 string[] prionResults = null;
@@ -102,8 +102,7 @@ public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity>
                         }
                     }
 
-                    chunk.Clear();
-                    queryBuilder.Clear();
+                    queryBuilder.Length = 0; // Clear the StringBuilder
                     Log.Info(string.Format("Processed '{0}' curves from Prion service (OBS ID population).", globalCount));
                     count = 0;
                 }
