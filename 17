@@ -1,54 +1,114 @@
-using log4net;
-using System;
-
-namespace UBS.Broil.Credit.OBS.PrionWS
+public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity> listOfOBSProviderEntity)
 {
-    internal class PrionModelTree : PrionModelTreeNode
+    Log.Info("Populating SymbolNames with OBS IDs...");
+
+    int prionRetries = 0;
+    bool prionQuerySuccessful = false;
+
+    int count = 0;
+    int globalCount = 0;
+    List<String> chunk = new List<string>();
+
+    foreach (OBSProviderEntity OBSProviderEntityInstance in listOfOBSProviderEntity)
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(PrionModelTree));
+        chunk.Add(OBSProviderEntityInstance.PermPath);
+        count++;
+        globalCount++;
 
-        private PrionModelTree() : base()
+        if ((count >= 100 || (listOfOBSProviderEntity.Count == globalCount) && count > 0))
         {
-            try
+            StringBuilder queryBuilder = new StringBuilder();
+            foreach (string permpath in chunk.ToArray())
             {
-                // Your existing initialization code
-                // ...
-
-                log.Info("PrionModelTree initialization succeeded.");
+                if (!string.IsNullOrWhiteSpace(permpath))
+                {
+                    queryBuilder.Append("PERMPATH_CURVEPATH == '");
+                    queryBuilder.Append(permpath);
+                    queryBuilder.Append("' | ");
+                }
             }
-            catch (Exception ex)
-            {
-                log.Error("PrionModelTree initialization failed.", ex);
-                throw; // Rethrow the exception to ensure it's not swallowed
-            }
-        }
 
-        public static PrionModelTree Instance
-        {
-            get
+            // Remove last OR bit...
+            if (queryBuilder.Length > 0)
             {
-                lock (lockInstance)
+                queryBuilder.Remove(queryBuilder.Length - 3, 3);
+
+                string resultType = "PERMPATH_OBJECT";
+                string[] prionResults = null;
+                prionRetries = 0;
+                prionQuerySuccessful = false;
+                while (prionRetries <= 1 && !prionQuerySuccessful)
                 {
                     try
                     {
-                        if (instance == null || !instance.IsCurrent)
-                        {
-                            log.Debug("Creating or refreshing PrionModelTree instance.");
-                            instance = new PrionModelTree();
-                        }
-
-                        return instance;
+                        prionResults = Prion.Instance.PosRequest(queryBuilder.ToString(), resultType);
+                        prionQuerySuccessful = true;
                     }
                     catch (Exception ex)
                     {
-                        log.Error("Error while getting PrionModelTree instance.", ex);
-                        throw; // Rethrow the exception to ensure it's not swallowed
+                        Log.Error("Error querying Prion with query: " + queryBuilder.ToString(), ex);
+                        prionRetries++;
+                        if (prionRetries <= 1)
+                            Log.Error("Retrying Prion query...");
+                        else
+                            prionQuerySuccessful = false;
                     }
                 }
+
+                if (prionQuerySuccessful)
+                {
+                    if (prionResults != null)
+                    {
+                        foreach (string prionResult in prionResults)
+                        {
+                            try
+                            {
+                                XmlDocument doc = new XmlDocument();
+                                doc.LoadXml(prionResult);
+
+                                XmlNode permPathOBSID = doc.SelectSingleNode("/*[local-name()='PERMPATH_OBJECT']/*[local-name()='PERMPATH_CURVEPATH']");
+                                XmlNode nodeOBSID = doc.SelectSingleNode("/*[local-name()='PERMPATH_OBJECT']/*[local-name()='PERMPATH_CURVEID']");
+
+                                if (permPathOBSID != null && nodeOBSID != null)
+                                {
+                                    List<OBSProviderEntity> tempList = listOfOBSProviderEntity
+                                        .Where(t => t.PermPath == permPathOBSID.InnerText)
+                                        .ToList();
+
+                                    if (tempList.Count >= 1)
+                                    {
+                                        OBSProviderEntity tempProviderEntity = tempList[0];
+                                        tempProviderEntity.OBSID = nodeOBSID.InnerText;
+                                    }
+                                    else
+                                    {
+                                        Log.Error("Error populating OBSID for PermPath='" + permPathOBSID.InnerText + "'");
+                                    }
+                                }
+                                else
+                                {
+                                    Log.Error("PermPath or OBSID is NULL in Prion result.");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error("Error analyzing a result from Prion. Message: " + ex.Message, ex);
+                            }
+                        }
+                    }
+
+                    chunk.Clear();
+                    queryBuilder.Clear();
+                    Log.Info($"Processed {globalCount} curves from Prion service (OBS ID population).");
+                    count = 0;
+                }
+            }
+            else
+            {
+                Log.Warn("No valid PERMPATH values found in the chunk.");
             }
         }
-
-        // Other methods in your class
-        // ...
     }
+
+    Log.Info("SymbolNames populated with OBS IDs successfully.");
 }
