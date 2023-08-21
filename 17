@@ -1,6 +1,8 @@
 public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity> listOfOBSProviderEntity)
 {
-    Log.Info("Populating SymbolNames with OBS IDs...");
+    Log.Info("Populating SymbolNames with OBS Ids...");
+
+    StringBuilder queryBuilder;
 
     int prionRetries = 0;
     bool prionQuerySuccessful = false;
@@ -17,10 +19,10 @@ public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity>
 
         if ((count >= 100 || (listOfOBSProviderEntity.Count == globalCount) && count > 0))
         {
-            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder = new StringBuilder();
             foreach (string permpath in chunk.ToArray())
             {
-                if (!string.IsNullOrWhiteSpace(permpath))
+                if (!string.IsNullOrEmpty(permpath) && !string.IsNullOrEmpty(permpath.Trim()))
                 {
                     queryBuilder.Append("PERMPATH_CURVEPATH == '");
                     queryBuilder.Append(permpath);
@@ -46,10 +48,13 @@ public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity>
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("Error querying Prion with query: " + queryBuilder.ToString(), ex);
+                        // log the error
+                        Log.Error("Error querying Prion with query: " + queryBuilder.ToString());
+
+                        // try again
                         prionRetries++;
                         if (prionRetries <= 1)
-                            Log.Error("Retrying Prion query...");
+                            Log.Error("Retrying Prion query ...");
                         else
                             prionQuerySuccessful = false;
                     }
@@ -99,7 +104,7 @@ public void PopulateListOfOBSProviderEntityWithOBSID(ref List<OBSProviderEntity>
 
                     chunk.Clear();
                     queryBuilder.Clear();
-                    Log.Info($"Processed {globalCount} curves from Prion service (OBS ID population).");
+                    Log.Info(string.Format("Processed '{0}' curves from Prion service (OBS ID population).", globalCount));
                     count = 0;
                 }
             }
