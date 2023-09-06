@@ -1,0 +1,183 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using Oracle.ManagedDataAccess.Client;
+using Oracle.ManagedDataAccess.Types;
+using Types.Data;
+
+namespace UBS.Firc.Broil.PortfolioService.ModelMap.Service
+{
+    internal static class DataAccess
+    {
+        private readonly static ILog Log = LogManager.GetLogger(typeof(DataAccess));
+
+        public static void AddErrorMessage(string qName, string errorMessage)
+        {
+            Log.Debug("Start AddErrorMessage");
+
+            try
+            {
+                using (var oracleConnection = new OracleConnection(BroilConfig.Get()["Broil_TradeQuery_Cache"]))
+                {
+                    oracleConnection.Open();
+
+                    using (var oracleCommand = new OracleCommand())
+                    {
+                        oracleCommand.CommandType = CommandType.StoredProcedure;
+                        oracleCommand.Connection = oracleConnection;
+                        oracleCommand.CommandText = "TRADE_CACHE_AQ.TRADEQUERY_AQ.enqueue_string";
+
+                        var oracleParameter = new OracleParameter("qName", OracleDbType.Varchar2, ParameterDirection.Input)
+                        {
+                            Value = string.Concat("TRADE_CACHE_AQ.", qName)
+                        };
+                        oracleCommand.Parameters.Add(oracleParameter);
+
+                        var oracleParameter1 = new OracleParameter("payload", OracleDbType.Varchar2, ParameterDirection.Input)
+                        {
+                            Value = string.Concat("<ERROR_MESSAGE>", errorMessage, "</ERROR_MESSAGE>")
+                        };
+                        oracleCommand.Parameters.Add(oracleParameter1);
+
+                        oracleCommand.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.Error(string.Concat("Error adding error message to queue ", qName), exception);
+            }
+            finally
+            {
+                Log.Debug("End AddErrorMessage");
+            }
+        }
+
+        public static decimal[] FetchTradesAmendedSince(DateTime asAt)
+        {
+            var decimals = new List<decimal>();
+
+            try
+            {
+                Log.InfoFormat("Start FetchTradesAmendedSince - {0}", asAt);
+
+                using (var oracleConnection = new OracleConnection(BroilConfig.Get()["Broil_TradeQuery_Cache"]))
+                {
+                    oracleConnection.Open();
+                    using (var oracleCommand = new OracleCommand("TRADE_CACHE_DBO.MODELMAP_CACHE_PKG.trades_amended_since", oracleConnection))
+                    {
+                        oracleCommand.CommandType = CommandType.StoredProcedure;
+
+                        var oracleParameter = new OracleParameter("p_asat", OracleDbType.Date, ParameterDirection.Input)
+                        {
+                            Value = asAt
+                        };
+                        oracleCommand.Parameters.Add(oracleParameter);
+
+                        var oracleParameter1 = new OracleParameter("p_Results", OracleDbType.RefCursor, ParameterDirection.Output);
+                        oracleCommand.Parameters.Add(oracleParameter1);
+
+                        using (OracleDataReader oracleDataReader = oracleCommand.ExecuteReader())
+                        {
+                            while (oracleDataReader.Read())
+                            {
+                                decimals.Add(oracleDataReader.GetDecimal(0));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not fetch amended trades", ex);
+                throw new ModelMapException("Could not fetch amended trades", ex);
+            }
+            finally
+            {
+                Log.Debug("End FetchTradesAmendedSince");
+            }
+
+            return decimals.ToArray();
+        }
+
+        // Other methods and code here...
+
+        public static void InsertModelMapAnswers(OracleConnection connection, PDTable trades, MessageType messageType)
+        {
+            try
+            {
+                Log.Debug("Start InsertModelMapAnswers");
+
+                if (connection.State != ConnectionState.Open)
+                {
+                    throw new ModelMapException("Oracle connection not open");
+                }
+
+                Log.Debug("Start BulkLoad");
+                using (var oracleCommand = new OracleCommand("TRADE_CACHE_DBO.MODELMAP_CACHE_PKG.insert_modelmap", connection))
+                {
+                    oracleCommand.CommandType = CommandType.StoredProcedure;
+
+                    var cacheId = new OracleParameter("p_tradepart_cache_id_tab", OracleDbType.Decimal, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(cacheId);
+
+                    var modelName = new OracleParameter("p_model_name_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelName);
+
+                    var modelMethod = new OracleParameter("p_model_method_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelMethod);
+
+                    var modelParameters = new OracleParameter("p_MODEL_PARAMETERS_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelParameters);
+
+                    var modelComments = new OracleParameter("p_model_comments_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelComments);
+
+                    var modelException = new OracleParameter("p_model_exception_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelException);
+
+                    var modelMap = new OracleParameter("p_model_map_tab", OracleDbType.Varchar2, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(modelMap);
+
+                    var validFrom = new OracleParameter("p_valid_from_tab", OracleDbType.Date, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(validFrom);
+
+                    var validTo = new OracleParameter("p_valid_to_tab", OracleDbType.Date, ParameterDirection.Input);
+                    oracleCommand.Parameters.Add(validTo);
+
+                    foreach (PDRow row in trades.Rows)
+                    {
+                        cacheId.Value = row["CACHE_ID"];
+                        modelName.Value = row["MODEL_NAME"];
+                        modelMethod.Value = row["MODEL_METHOD"];
+                        modelParameters.Value = row["MODEL_PARAMETERS"];
+                        modelComments.Value = row["MODEL_COMMENTS"];
+                        modelException.Value = row["MODEL_EXCEPTION"];
+                        modelMap.Value = row["MODEL_MAP"];
+                        validFrom.Value = messageType != MessageType.TradeEvent ? DateTime.UtcNow : row["VALID_FROM"];
+                        validTo.Value = row["VALID_TO"];
+
+                        oracleCommand.ExecuteNonQuery();
+                    }
+
+                    Log.Info(string.Format("Inserted {0} new model maps", trades.Count));
+                }
+            }
+            catch (ModelMapException modelMapException)
+            {
+                Log.Error("BulkLoad failed, no model maps inserted.", modelMapException);
+                throw;
+            }
+            catch (Exception exception1)
+            {
+                Exception exception = exception1;
+                Log.Error("BulkLoad failed, no model maps inserted.", exception);
+                throw new ModelMapException("BulkLoad failed.", exception);
+            }
+            finally
+            {
+                Log.Debug("End InsertModelMapAnswers");
+            }
+        }
+    }
+}
