@@ -1,29 +1,23 @@
-int maxRetries = 3;  // Define the maximum number of retry attempts
-int retryDelayMilliseconds = 1000;  // Define the delay between retries in milliseconds
+string uniqueKey = "yourUniqueKey";
+string modelName = "yourModelName";
+double elapsedTime = 123.45; // Replace with the actual value
+string tradeList = "yourTradeList";
 
-for (int retryCount = 0; retryCount < maxRetries; retryCount++)
+string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+string record = String.Format("{0},{1},{2},{3},{4},{5},{6}",
+    uniqueKey.Replace(',', '.'),
+    uniqueKey,
+    modelName,
+    elapsedTime,
+    timestamp,
+    tradeList,
+    Environment.NewLine);
+
+// Specify the file path
+string filePath = EngineJob.TradeLookUpFileName;
+
+// Create a StreamWriter for appending to the file
+using (StreamWriter writer = new StreamWriter(filePath, true))
 {
-    try
-    {
-        string header = "WU Key,TradeType,Number of Trades,Hash Code,Model Name,WU Creation Time (Relative),WU Creation Time (Absolute),Trade List";
-        File.AppendAllText(TradeLookUpFileName, $"{header}{Environment.NewLine}");
-        Log.Info($"Created work unit details file at {TradeLookUpFileName}");
-        
-        // If the file was saved successfully, break out of the loop
-        break;
-    }
-    catch (Exception ex)
-    {
-        Log.Error($"Error while creating work unit details file: {ex.Message}");
-        
-        // If this was the last retry attempt, you can choose to handle the error or throw an exception
-        if (retryCount == maxRetries - 1)
-        {
-            Log.Error("Failed to save the file after multiple retries.");
-            // Handle the error or throw an exception as needed.
-        }
-        
-        // Delay before the next retry
-        Thread.Sleep(retryDelayMilliseconds);
-    }
+    writer.WriteLine(record);
 }
