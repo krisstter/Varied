@@ -1,0 +1,39 @@
+private static Mutex fileMutex = new Mutex(); // Create a Mutex for file access
+
+    static void Main()
+    {
+        string uniqueKey = "yourUniqueKey";
+        string modelName = "yourModelName";
+        double elapsedTime = 123.45; // Replace with the actual value
+        string tradeList = "yourTradeList";
+
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        string record = String.Format("{0},{1},{2},{3},{4},{5},{6}",
+            uniqueKey.Replace(',', '.'),
+            uniqueKey,
+            modelName,
+            elapsedTime,
+            timestamp,
+            tradeList,
+            Environment.NewLine);
+
+        string filePath = EngineJob.TradeLookUpFileName;
+
+        try
+        {
+            fileMutex.WaitOne(); // Wait for exclusive access to the file
+
+            using (StreamWriter writer = new StreamWriter(filePath, true))
+            {
+                writer.WriteLine(record);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log an error message with the exception details to the Event Log
+            LogToEventLog($"Error appending to file: {ex.Message}", EventLogEntryType.Error);
+        }
+        finally
+        {
+            fileMutex.ReleaseMutex(); // Release the Mutex to allow other threads/processes to access the file
+        }
