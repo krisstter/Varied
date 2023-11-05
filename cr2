@@ -1,0 +1,44 @@
+int maxRetries = 3; // Define the maximum number of retry attempts
+int retryDelayMilliseconds = 1000; // Define the delay between retries in milliseconds
+
+for (int retryCount = 0; retryCount < maxRetries; retryCount++)
+{
+    FileStream stream = null;
+    StreamWriter writer = null;
+
+    try
+    {
+        string header = "WU Key,TradeType,Number of Trades,Hash Code,Model Name,WU Creation Time (Relative),WU Creation Time (Absolute),Trade List";
+        stream = new FileStream(TradeLookUpFileName, FileMode.Append, FileAccess.Write);
+        writer = new StreamWriter(stream);
+        writer.WriteLine($"{header}{Environment.NewLine}");
+
+        writer.Close();
+        stream.Close();
+
+        Log.Info($"Created work unit details file at {TradeLookUpFileName}");
+
+        // If the file was saved successfully, break out of the loop
+        break;
+    }
+    catch (Exception ex)
+    {
+        Log.Error($"Error while creating work unit details file: {ex.Message}");
+
+        // If this was the last retry attempt, you can choose to handle the error or throw an exception
+        if (retryCount == maxRetries - 1)
+        {
+            Log.Error("Failed to save the file after multiple retries.");
+            // Handle the error or throw an exception as needed.
+        }
+
+        // Ensure that the file and stream are closed in case of an exception
+        if (writer != null)
+            writer.Close();
+        if (stream != null)
+            stream.Close();
+
+        // Delay before the next retry
+        System.Threading.Thread.Sleep(retryDelayMilliseconds);
+    }
+}
