@@ -1,0 +1,17 @@
+# Step 1: Load the XML file
+$xmlFilePath = "C:\Path\To\Your\File.xml"
+$xml = Get-Content -Path $xmlFilePath
+
+# Step 2: Read values from the text file
+$textFilePath = "C:\Path\To\Your\Values.txt"
+$values = Get-Content -Path $textFilePath
+
+# Step 3: Update XML with values
+foreach ($value in $values) {
+    $xml.SelectNodes("//NodeToUpdate") | ForEach-Object {
+        $_.InnerText = $value
+    }
+}
+
+# Save the updated XML back to the file
+$xml.Save($xmlFilePath)
