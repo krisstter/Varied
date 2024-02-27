@@ -1,0 +1,30 @@
+# Define the path to your XML file
+$xmlFilePath = "C:\path\to\your\file.xml"
+
+# Define the value you're searching for
+$searchValue = "YourSearchValueHere"
+
+# Create an XmlReader to efficiently read the XML file
+$xmlReader = [System.Xml.XmlReader]::Create($xmlFilePath)
+
+try {
+    # Loop through the XML elements using the XmlReader
+    while ($xmlReader.Read()) {
+        # Check if the current node is an element
+        if ($xmlReader.NodeType -eq 'Element') {
+            # Check if the element's name matches what you're looking for
+            if ($xmlReader.Name -eq 'ElementName') {
+                # Read the element's inner text and compare with the search value
+                $elementValue = $xmlReader.ReadElementString()
+                if ($elementValue -eq $searchValue) {
+                    Write-Host "Value '$searchValue' found in element: $($xmlReader.Name)"
+                    # You can add further actions here based on your requirements
+                }
+            }
+        }
+    }
+}
+finally {
+    # Close the XmlReader
+    $xmlReader.Close()
+}
