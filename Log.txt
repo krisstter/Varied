@@ -1,0 +1,134 @@
+# Define source directory to watch
+$sourceDirectory = "C:\SourceDirectory"
+
+# Define destination directories based on last update time
+$destinationDirectories = @{
+    "recent" = "C:\DestinationDirectory\Recent"
+    "old" = "C:\DestinationDirectory\Old"
+}
+
+# File to store the last change timestamp
+$lastChangeFile = "C:\LastChange.txt"
+
+# Log file settings
+$logDirectory = "C:\Logs"
+$logFileName = "FileWatcherLog"
+$logFileExtension = ".log"
+$logFileSizeLimitMB = 10  # Set the maximum size limit for log files in MB
+$logFileCountLimit = 5    # Set the maximum number of log files to keep
+
+# Function to determine destination based on last update time
+function Get-DestinationDirectory {
+    param([datetime]$lastWriteTime)
+
+    # Define the threshold for what's considered a recent file (e.g., within the last 7 days)
+    $recentThreshold = (Get-Date).AddDays(-7)
+
+    # Compare the last write time to the threshold
+    if ($lastWriteTime -ge $recentThreshold) {
+        return $destinationDirectories["recent"]
+    } else {
+        return $destinationDirectories["old"]
+    }
+}
+
+# Function to read the last change timestamp from file
+function Get-LastChangeTimestamp {
+    if (Test-Path $lastChangeFile) {
+        return Get-Content $lastChangeFile
+    } else {
+        return $null
+    }
+}
+
+# Function to update the last change timestamp in file
+function Update-LastChangeTimestamp {
+    $timestamp = Get-Date
+    $timestamp | Out-File -FilePath $lastChangeFile -Append
+}
+
+# Function to create a new log file with rotation support
+function New-RotatingLogFile {
+    $currentLogFile = Join-Path -Path $logDirectory -ChildPath "$logFileName$logFileExtension"
+    
+    # Check if log directory exists, if not create it
+    if (-not (Test-Path $logDirectory)) {
+        New-Item -Path $logDirectory -ItemType Directory | Out-Null
+    }
+
+    # Check if current log file exceeds size limit
+    if ((Test-Path $currentLogFile) -and ((Get-Item $currentLogFile).length / 1MB -ge $logFileSizeLimitMB)) {
+        # Rename the current log file with a timestamp
+        $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+        $newLogFileName = "$logFileName-$timestamp$logFileExtension"
+        Rename-Item -Path $currentLogFile -NewName $newLogFileName
+
+        # Remove old log files exceeding count limit
+        $logFiles = Get-ChildItem -Path $logDirectory -Filter "$logFileName*$logFileExtension" | Sort-Object -Property LastWriteTime -Descending
+        $filesToRemove = $logFiles | Select-Object -Skip $logFileCountLimit
+        if ($filesToRemove) {
+            $filesToRemove | Remove-Item -Force
+        }
+    }
+
+    # Start transcript to capture script output
+    Start-Transcript -Path $currentLogFile -Append
+}
+
+# Function to stop the logging
+function Stop-RotatingLogFile {
+    # Stop transcript
+    Stop-Transcript
+}
+
+# Function to create a new rotating log file
+New-RotatingLogFile
+
+# Create a file system watcher
+$watcher = New-Object System.IO.FileSystemWatcher
+$watcher.Path = $sourceDirectory
+$watcher.Filter = "*.*"  # Watch all files
+$watcher.IncludeSubdirectories = $false
+$watcher.EnableRaisingEvents = $true
+
+# Define the action to take when a new file is created
+$action = {
+    $path = $Event.SourceEventArgs.FullPath
+    $name = $Event.SourceEventArgs.Name
+    $changeType = $Event.SourceEventArgs.ChangeType
+    $timestamp = (Get-Item $path).LastWriteTime
+    $destination = Get-DestinationDirectory -lastWriteTime $timestamp
+
+    Write-Host "New file detected: $name, Last Write Time: $timestamp, Destination: $destination"
+
+    # Check if the file has been modified since the last check
+    $lastChange = Get-LastChangeTimestamp
+    if ($lastChange -and (Get-Item $path).LastWriteTime -gt $lastChange) {
+        # File has been modified, copy it to the appropriate destination
+        Copy-Item -Path $path -Destination $destination -Force
+        Write-Host "File $name has been modified. Copied to $destination."
+    }
+
+    # Update the last change timestamp
+    Update-LastChangeTimestamp
+}
+
+# Register the action to the Created event
+Register-ObjectEvent -InputObject $watcher -EventName Created -SourceIdentifier FileCreated -Action $action
+
+# Monitor for changes indefinitely
+try {
+    while ($true) {
+        # Check if it's time to rotate the log file
+        New-RotatingLogFile
+
+        Wait-Event -Timeout 5
+    }
+} finally {
+    # Stop logging
+    Stop-RotatingLogFile
+
+    # Clean up the watcher when done
+    Unregister-Event -SourceIdentifier FileCreated
+    $watcher.Dispose()
+}
