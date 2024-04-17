@@ -1,0 +1,46 @@
+# Define the directory containing the files
+$directory = "C:\path\to\your\directory"
+
+# Define an array of patterns to search for
+$patterns = @("pattern1_to_find", "pattern2_to_find", "pattern3_to_find")
+
+# Get all files in the directory with the specified pattern
+$files = Get-ChildItem -Path $directory -Filter "*.txt"
+
+# Loop through each file
+foreach ($file in $files) {
+    # Create a StreamReader object to read the file
+    $reader = [System.IO.StreamReader]::new($file.FullName)
+
+    # Create a StringBuilder object to store updated content
+    $newContent = [System.Text.StringBuilder]::new()
+
+    # Read each line
+    while ($reader.Peek() -ge 0) {
+        $line = $reader.ReadLine()
+        
+        # Check if the line contains any of the patterns
+        $containsPattern = $false
+        foreach ($pattern in $patterns) {
+            if ($line -match $pattern) {
+                $containsPattern = $true
+                break
+            }
+        }
+
+        # Add the line to the new content if it doesn't contain any of the patterns
+        if (-not $containsPattern) {
+            [void]$newContent.AppendLine($line)
+        }
+    }
+
+    # Close the StreamReader
+    $reader.Close()
+
+    # Write the updated content back to the file
+    [System.IO.File]::WriteAllText($file.FullName, $newContent.ToString())
+
+    Write-Host "Lines containing patterns removed from file $($file.FullName)"
+}
+
+Write-Host "Operation completed for all files in $directory"
