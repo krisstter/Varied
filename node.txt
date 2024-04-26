@@ -1,0 +1,18 @@
+# Load the XML file
+$xmlFilePath = "path\to\your\file.xml"
+$xml = [xml](Get-Content -Path $xmlFilePath)
+
+# Define the pattern you want to search for
+$pattern = "your_pattern_here"
+
+# Find the specific node based on the pattern
+$nodes = $xml.SelectNodes("//node[toMatch = '$pattern']")
+
+# Loop through each matching node
+foreach ($node in $nodes) {
+    # Modify the specific node
+    $node.InnerXml = "new_value_here"
+}
+
+# Save the modified XML content back to the file
+$xml.Save($xmlFilePath)
