@@ -29,3 +29,45 @@ for ($i = 0; $i -lt $xmlContent.Count; $i++) {
 
 # Save the modified XML content back to the file
 $xmlContent | Set-Content -Path $xmlFilePath
+
+
+# Define the path to your XML file
+$xmlFilePath = "path\to\your\file.xml"
+
+# Define the pattern you want to search for within <GPL_TICKET> node
+$pattern = "pattern to search"
+
+# Open the XML file for reading
+$streamReader = [System.IO.StreamReader]::new($xmlFilePath)
+
+# Create a temporary file to store modified content
+$tempFilePath = [System.IO.Path]::GetTempFileName()
+$tempStreamWriter = [System.IO.StreamWriter]::new($tempFilePath)
+
+# Loop through each line of the XML file
+while ($line = $streamReader.ReadLine()) {
+    # Check if the line contains the pattern within <GPL_TICKET> node
+    if ($line -match "<GPL_TICKET>$pattern</GPL_TICKET>") {
+        # Extract the value within <VAL> node using regex
+        if ($line -match "<VAL>([^<]*)</VAL>") {
+            $valNodeContent = $matches[1]
+
+            # Modify the content of <VAL> node
+            $newValNodeContent = $valNodeContent + " additional_text"
+
+            # Replace the content of <VAL> node in the line
+            $line = $line -replace "<VAL>([^<]*)</VAL>", "<VAL>$newValNodeContent</VAL>"
+        }
+    }
+
+    # Write the modified line to the temporary file
+    $tempStreamWriter.WriteLine($line)
+}
+
+# Close the streams
+$streamReader.Close()
+$tempStreamWriter.Close()
+
+# Replace the original file with the modified file
+Copy-Item -Path $tempFilePath -Destination $xmlFilePath -Force
+Remove-Item -Path $tempFilePath
