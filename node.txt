@@ -16,3 +16,32 @@ foreach ($node in $nodes) {
 
 # Save the modified XML content back to the file
 $xml.Save($xmlFilePath)
+
+
+
+
+
+# Load the XML file
+$xmlFilePath = "path\to\your\file.xml"
+$xmlContent = Get-Content -Path $xmlFilePath
+
+# Define the pattern you want to search for
+$pattern = "your_pattern_here"
+
+# Loop through each line of the XML file
+for ($i = 0; $i -lt $xmlContent.Count; $i++) {
+    $line = $xmlContent[$i]
+
+    # Check if the line matches the pattern
+    if ($line -match $pattern) {
+        # Modify the line as needed
+        $modifiedLine = $line -replace "original_pattern", "replacement_string"
+
+        # Replace the line in the XML content
+        $xmlContent[$i] = $modifiedLine
+    }
+}
+
+# Save the modified XML content back to the file
+$xmlContent | Set-Content -Path $xmlFilePath
+
