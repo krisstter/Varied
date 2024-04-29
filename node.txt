@@ -2,16 +2,16 @@
 $xmlFilePath = "path\to\your\file.xml"
 $xml = [xml](Get-Content -Path $xmlFilePath)
 
-# Define the pattern you want to search for
+# Define the pattern you want to search for in the inner text
 $pattern = "your_pattern_here"
 
-# Find the specific node based on the pattern
-$nodes = $xml.SelectNodes("//node[toMatch = '$pattern']")
+# Find the specific node(s) based on the inner text pattern
+$nodes = $xml.SelectNodes("//node[contains(., '$pattern')]")
 
-# Loop through each matching node
+# Loop through each node
 foreach ($node in $nodes) {
-    # Modify the specific node
-    $node.InnerXml = "new_value_here"
+    # Modify the inner text of the node
+    $node.InnerText = $node.InnerText + " additional_text"
 }
 
 # Save the modified XML content back to the file
