@@ -1,28 +1,5 @@
 # Load the XML file
 $xmlFilePath = "path\to\your\file.xml"
-$xml = [xml](Get-Content -Path $xmlFilePath)
-
-# Define the pattern you want to search for in the inner text
-$pattern = "your_pattern_here"
-
-# Find the specific node(s) based on the inner text pattern
-$nodes = $xml.SelectNodes("//node[contains(., '$pattern')]")
-
-# Loop through each node
-foreach ($node in $nodes) {
-    # Modify the inner text of the node
-    $node.InnerText = $node.InnerText + " additional_text"
-}
-
-# Save the modified XML content back to the file
-$xml.Save($xmlFilePath)
-
-
-
-
-
-# Load the XML file
-$xmlFilePath = "path\to\your\file.xml"
 $xmlContent = Get-Content -Path $xmlFilePath
 
 # Define the pattern you want to search for within <GPL_TICKET> node
@@ -35,14 +12,14 @@ for ($i = 0; $i -lt $xmlContent.Count; $i++) {
     # Check if the line contains the pattern within <GPL_TICKET> node
     if ($line -match "<GPL_TICKET>$pattern</GPL_TICKET>") {
         # Extract the value within <VAL> node using regex
-        if ($line -match "<VAL>(.*?)</VAL>") {
+        if ($line -match "<VAL>([^<]*)</VAL>") {
             $valNodeContent = $matches[1]
 
             # Modify the content of <VAL> node
             $newValNodeContent = $valNodeContent + " additional_text"
 
             # Replace the content of <VAL> node in the line
-            $line = $line -replace "<VAL>(.*?)</VAL>", "<VAL>$newValNodeContent</VAL>"
+            $line = $line -replace "<VAL>([^<]*)</VAL>", "<VAL>$newValNodeContent</VAL>"
             
             # Update the line in the XML content
             $xmlContent[$i] = $line
@@ -52,4 +29,3 @@ for ($i = 0; $i -lt $xmlContent.Count; $i++) {
 
 # Save the modified XML content back to the file
 $xmlContent | Set-Content -Path $xmlFilePath
-
