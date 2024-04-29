@@ -25,20 +25,28 @@ $xml.Save($xmlFilePath)
 $xmlFilePath = "path\to\your\file.xml"
 $xmlContent = Get-Content -Path $xmlFilePath
 
-# Define the pattern you want to search for
-$pattern = "your_pattern_here"
+# Define the pattern you want to search for within <GPL_TICKET> node
+$pattern = "pattern to search"
 
 # Loop through each line of the XML file
 for ($i = 0; $i -lt $xmlContent.Count; $i++) {
     $line = $xmlContent[$i]
 
-    # Check if the line matches the pattern
-    if ($line -match $pattern) {
-        # Modify the line as needed
-        $modifiedLine = $line -replace "original_pattern", "replacement_string"
+    # Check if the line contains the pattern within <GPL_TICKET> node
+    if ($line -match "<GPL_TICKET>$pattern</GPL_TICKET>") {
+        # Extract the value within <VAL> node using regex
+        if ($line -match "<VAL>(.*?)</VAL>") {
+            $valNodeContent = $matches[1]
 
-        # Replace the line in the XML content
-        $xmlContent[$i] = $modifiedLine
+            # Modify the content of <VAL> node
+            $newValNodeContent = $valNodeContent + " additional_text"
+
+            # Replace the content of <VAL> node in the line
+            $line = $line -replace "<VAL>(.*?)</VAL>", "<VAL>$newValNodeContent</VAL>"
+            
+            # Update the line in the XML content
+            $xmlContent[$i] = $line
+        }
     }
 }
 
