@@ -71,3 +71,12 @@ $tempStreamWriter.Close()
 # Replace the original file with the modified file
 Copy-Item -Path $tempFilePath -Destination $xmlFilePath -Force
 Remove-Item -Path $tempFilePath
+
+
+
+configuration>
+  <config>
+    <add key="repositoryPath" value="..\Packages" />
+    <add key="globalPackagesFolder" value="..\Packages" />
+  </config>
+</configuration>
