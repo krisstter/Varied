@@ -1,0 +1,4 @@
+before_script:
+  - if [ "$CI_JOB_STAGE" == "build" ]; then
+      echo "This runs only before build jobs";
+    fi
