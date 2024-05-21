@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Define variables
+SSC_URL="https://fortify-ssc.example.com"
+SSC_TOKEN="your_fortify_token"
+BUILD_ID_PREFIX="my_dotnet_project"
+SOLUTIONS_FILE="solution_files.txt"
+
+# Check if the solutions file exists
+if [ ! -f "$SOLUTIONS_FILE" ]; then
+  echo "Solutions file not found: $SOLUTIONS_FILE"
+  exit 1
+fi
+
+# Read solution files from the file
+while IFS= read -r solution_file; do
+  # Check if the solution file path is not empty
+  if [ -z "$solution_file" ]; then
+    continue
+  fi
+
+  # Check if the solution file exists
+  if [ ! -f "$solution_file" ]; then
+    echo "Solution file not found: $solution_file"
+    continue
+  fi
+
+  # Extract the solution file directory
+  solution_dir=$(dirname "$solution_file")
+  
+  # Extract the solution file name without the path and extension
+  solution_name=$(basename "$solution_file" .sln)
+  
+  # Define a unique build ID for each solution file
+  BUILD_ID="${BUILD_ID_PREFIX}_${solution_name}"
+  
+  echo "Processing solution file: $solution_file with build ID: $BUILD_ID"
+
+  # Clean any previous Fortify results for this build ID
+  sourceanalyzer -b "$BUILD_ID" -clean || { echo "Failed to clean previous sessions for $BUILD_ID"; exit 1; }
+
+  # Translate the source code files into Fortify intermediate format with GC settings
+  sourceanalyzer -b "$BUILD_ID" -Xms2G -Xmx4G -Xss1M -J-XX:+UseG1GC -J-XX:+ParallelRefProcEnabled -J-XX:MaxGCPauseMillis=200 $(find "$solution_dir" -name '*.cs') || { echo "Translation failed for $BUILD_ID"; exit 1; }
+
+  # Run the Fortify scan
+  sourceanalyzer -b "$BUILD_ID" -scan -f "${solution_name}.fpr" || { echo "Scan failed for $BUILD_ID"; exit 1; }
+
+  # Upload the scan results to Fortify SSC
+  fortifyclient -url "$SSC_URL" -authtoken "$SSC_TOKEN" uploadFPR -file "${solution_name}.fpr" -project "$solution_name" -version "1.0" || { echo "Upload failed for $BUILD_ID"; exit 1; }
+
+  echo "Fortify scan and upload completed successfully for $solution_name"
+done < "$SOLUTIONS_FILE"
