@@ -1,0 +1,18 @@
+# Define the batch file path
+$batchFilePath = "C:\path\to\fortify_scan.bat"
+
+# Check if the batch file exists
+if (-Not (Test-Path $batchFilePath)) {
+    Write-Host "Batch file not found: $batchFilePath"
+    exit 1
+}
+
+# Execute the batch file
+Write-Host "Running Fortify scan using batch file"
+& $batchFilePath
+if ($LastExitCode -ne 0) {
+    Write-Host "Fortify scan failed"
+    exit 1
+}
+
+Write-Host "Fortify scan completed successfully"
