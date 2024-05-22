@@ -14,3 +14,21 @@ fortify_scan:
   variables:
     SSC_URL: $SSC_URL
     FORTIFY_TOKEN: $FORTIFY_TOKEN
+
+stages:
+  - fortify_scan
+
+before_script:
+  - powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process"
+  - powershell -Command "[System.Environment]::SetEnvironmentVariable('PATH', $Env:PATH + ';C:\path\to\fortify\bin')"
+  - powershell -Command "[System.Environment]::SetEnvironmentVariable('PATH', $Env:PATH + ';C:\path\to\dotnet\sdk')"
+
+fortify_scan:
+  stage: fortify_scan
+  script:
+    - powershell -File .\run_fortify_scan.ps1
+  only:
+    - branches
+  variables:
+    SSC_URL: $SSC_URL
+    FORTIFY_TOKEN: $FORTIFY_TOKEN
