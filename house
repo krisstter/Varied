@@ -7,33 +7,37 @@ $dateThreshold = (Get-Date).AddMonths(-3)
 # Get the directory information using .NET
 $directoryInfo = New-Object System.IO.DirectoryInfo $targetDirectory
 
-# Get all files in the directory
-$files = $directoryInfo.GetFiles()
+# Initialize a counter for deleted files
+$deletedFileCount = 0
 
-# Filter and delete files older than the threshold date
-foreach ($file in $files) {
-    if ($file.CreationTime -lt $dateThreshold) {
-        try {
-            $file.Delete()
-            Write-Output "Deleted file: $($file.FullName)"
-        } catch {
-            Write-Error "Failed to delete file: $($file.FullName). Error: $_"
-        }
-    }
-}
+# Function to delete files older than the threshold date
+function Delete-OldFiles($directoryInfo) {
+    global $deletedFileCount
 
-# Optional: To include subdirectories
-$subdirectories = $directoryInfo.GetDirectories("*", [System.IO.SearchOption]::AllDirectories)
-foreach ($subdirectory in $subdirectories) {
-    $files = $subdirectory.GetFiles()
+    # Get all files in the directory
+    $files = $directoryInfo.GetFiles()
+
+    # Filter and delete files older than the threshold date
     foreach ($file in $files) {
         if ($file.CreationTime -lt $dateThreshold) {
             try {
                 $file.Delete()
-                Write-Output "Deleted file: $($file.FullName)"
+                $deletedFileCount++
             } catch {
                 Write-Error "Failed to delete file: $($file.FullName). Error: $_"
             }
         }
     }
+
+    # Optional: To include subdirectories
+    $subdirectories = $directoryInfo.GetDirectories("*", [System.IO.SearchOption]::TopDirectoryOnly)
+    foreach ($subdirectory in $subdirectories) {
+        Delete-OldFiles $subdirectory
+    }
 }
+
+# Call the function to delete old files
+Delete-OldFiles $directoryInfo
+
+# Output the count of deleted files
+Write-Output "Total deleted files: $deletedFileCount"
