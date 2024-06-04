@@ -1,0 +1,21 @@
+# Define the path to the log file and the pattern to search for
+$logFilePath = "C:\path\to\your\large\logfile.log"
+$pattern = "your_search_pattern"
+
+# Compile the regex pattern for faster repeated use
+$regex = [System.Text.RegularExpressions.Regex]::new($pattern, [System.Text.RegularExpressions.RegexOptions]::Compiled)
+
+# Open the file and read it line by line
+[System.IO.StreamReader] $reader = [System.IO.StreamReader]::new($logFilePath)
+try {
+    while ($null -ne ($line = $reader.ReadLine())) {
+        if ($regex.IsMatch($line)) {
+            # Output the matched line
+            $line
+        }
+    }
+}
+finally {
+    # Ensure the file is closed properly
+    $reader.Close()
+}
