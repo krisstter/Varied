@@ -25,3 +25,12 @@ SELECT
     USER_DATA.THE(*) AS USER_DATA
 FROM 
     AQ$YOUR_QUEUE_TABLE_NAME;
+
+
+SELECT 
+    MSGID,            -- Adjust based on the actual column name from the DESC output
+    ENQ_TIME,         -- Adjust based on the actual column name from the DESC output
+    DEQ_TIME,         -- Adjust based on the actual column name from the DESC output
+    TREAT(USER_DATA AS TQ_MESSAGE_TYPE) AS USER_DATA
+FROM 
+    AQ$MY_QUEUE_TABLE;
