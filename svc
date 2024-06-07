@@ -16,13 +16,23 @@ foreach ($entry in $config) {
     # Restart the service on the remote host
     try {
         Write-Host "Attempting to restart service '$serviceName' on host '$hostname'"
-        Invoke-Command -ComputerName $hostname -ScriptBlock {
+        $result = Invoke-Command -ComputerName $hostname -ScriptBlock {
             param ($serviceName)
-            Restart-Service -Name $serviceName -Force
+            try {
+                Restart-Service -Name $serviceName -Force
+                return "Success"
+            } catch {
+                return "Failure: $_"
+            }
         } -ArgumentList $serviceName
 
-        Write-Host "Successfully restarted service '$serviceName' on host '$hostname'"
-        $successfulRestarts += "$serviceName on $hostname"
+        if ($result -eq "Success") {
+            Write-Host "Successfully restarted service '$serviceName' on host '$hostname'"
+            $successfulRestarts += "$serviceName on $hostname"
+        } else {
+            Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $result"
+            $failedRestarts += "$serviceName on $hostname (Error: $result)"
+        }
     } catch {
         Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $_"
         $failedRestarts += "$serviceName on $hostname (Error: $_)"
