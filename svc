@@ -1,8 +1,12 @@
 # Define the path to the configuration file
-$configFilePath = "C:\path\to\services_config.csv"
+$configFilePath = "C:\path\to\services_config.json"
 
-# Import the CSV file
-$config = Import-Csv -Path $configFilePath
+# Import the JSON file
+$config = Get-Content -Path $configFilePath | ConvertFrom-Json
+
+# Initialize arrays to hold success and failure entries
+$successfulRestarts = @()
+$failedRestarts = @()
 
 # Loop through each entry in the configuration
 foreach ($entry in $config) {
@@ -18,7 +22,17 @@ foreach ($entry in $config) {
         } -ArgumentList $serviceName
 
         Write-Host "Successfully restarted service '$serviceName' on host '$hostname'"
+        $successfulRestarts += "$serviceName on $hostname"
     } catch {
         Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $_"
+        $failedRestarts += "$serviceName on $hostname (Error: $_)"
     }
 }
+
+# Print the results
+Write-Host "`nSummary of Service Restarts:"
+Write-Host "`nSuccessful Restarts:"
+$successfulRestarts | ForEach-Object { Write-Host $_ }
+
+Write-Host "`nFailed Restarts:"
+$failedRestarts | ForEach-Object { Write-Host $_ }
