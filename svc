@@ -1,0 +1,24 @@
+# Define the path to the configuration file
+$configFilePath = "C:\path\to\services_config.csv"
+
+# Import the CSV file
+$config = Import-Csv -Path $configFilePath
+
+# Loop through each entry in the configuration
+foreach ($entry in $config) {
+    $serviceName = $entry.ServiceName
+    $hostname = $entry.Hostname
+
+    # Restart the service on the remote host
+    try {
+        Write-Host "Attempting to restart service '$serviceName' on host '$hostname'"
+        Invoke-Command -ComputerName $hostname -ScriptBlock {
+            param ($serviceName)
+            Restart-Service -Name $serviceName -Force
+        } -ArgumentList $serviceName
+
+        Write-Host "Successfully restarted service '$serviceName' on host '$hostname'"
+    } catch {
+        Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $_"
+    }
+}
