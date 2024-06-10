@@ -1,48 +1,67 @@
-# Define the path to the configuration file
-$configFilePath = "C:\path\to\services_config.json"
+function Restart-Services {
+    param (
+        [string]$configFilePath
+    )
 
-# Import the JSON file
-$config = Get-Content -Path $configFilePath | ConvertFrom-Json
+    # Import the JSON file
+    $config = Get-Content -Path $configFilePath | ConvertFrom-Json
 
-# Initialize arrays to hold success and failure entries
-$successfulRestarts = @()
-$failedRestarts = @()
+    # Initialize arrays to hold success and failure entries
+    $successfulRestarts = @()
+    $failedRestarts = @()
+    $jobs = @()
 
-# Loop through each entry in the configuration
-foreach ($entry in $config) {
-    $serviceName = $entry.ServiceName
-    $hostname = $entry.Hostname
+    # Loop through each entry in the configuration and start jobs
+    foreach ($entry in $config) {
+        $serviceName = $entry.ServiceName
+        $hostname = $entry.Hostname
 
-    # Restart the service on the remote host
-    try {
-        Write-Host "Attempting to restart service '$serviceName' on host '$hostname'"
-        $result = Invoke-Command -ComputerName $hostname -ScriptBlock {
-            param ($serviceName)
+        $jobs += Start-Job -ScriptBlock {
+            param ($serviceName, $hostname)
             try {
-                Restart-Service -Name $serviceName -Force
-                return "Success"
-            } catch {
-                return "Failure: $_"
-            }
-        } -ArgumentList $serviceName
+                Write-Host "Attempting to restart service '$serviceName' on host '$hostname'"
+                $result = Invoke-Command -ComputerName $hostname -ScriptBlock {
+                    param ($serviceName)
+                    try {
+                        Restart-Service -Name $serviceName -Force
+                        return "Success"
+                    } catch {
+                        return "Failure: $_"
+                    }
+                } -ArgumentList $serviceName
 
-        if ($result -eq "Success") {
-            Write-Host "Successfully restarted service '$serviceName' on host '$hostname'"
-            $successfulRestarts += "$serviceName on $hostname"
-        } else {
-            Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $result"
-            $failedRestarts += "$serviceName on $hostname (Error: $result)"
-        }
-    } catch {
-        Write-Host "Failed to restart service '$serviceName' on host '$hostname'. Error: $_"
-        $failedRestarts += "$serviceName on $hostname (Error: $_)"
+                if ($result -eq "Success") {
+                    return "Successfully restarted service '$serviceName' on host '$hostname'"
+                } else {
+                    return "Failed to restart service '$serviceName' on host '$hostname'. Error: $result"
+                }
+            } catch {
+                return "Failed to restart service '$serviceName' on host '$hostname'. Error: $_"
+            }
+        } -ArgumentList $serviceName, $hostname
     }
+
+    # Wait for all jobs to complete
+    $jobs | ForEach-Object { 
+        $jobResult = Receive-Job -Job $_ -Wait
+
+        if ($jobResult -match "Successfully restarted") {
+            $successfulRestarts += $jobResult
+        } else {
+            $failedRestarts += $jobResult
+        }
+
+        Remove-Job -Job $_
+    }
+
+    # Print the results
+    Write-Host "`nSummary of Service Restarts:"
+    Write-Host "`nSuccessful Restarts:"
+    $successfulRestarts | ForEach-Object { Write-Host $_ }
+
+    Write-Host "`nFailed Restarts:"
+    $failedRestarts | ForEach-Object { Write-Host $_ }
 }
 
-# Print the results
-Write-Host "`nSummary of Service Restarts:"
-Write-Host "`nSuccessful Restarts:"
-$successfulRestarts | ForEach-Object { Write-Host $_ }
-
-Write-Host "`nFailed Restarts:"
-$failedRestarts | ForEach-Object { Write-Host $_ }
+# Call the function with the path to your configuration file
+Restart-Services -configFilePath "C:\path\to\services_config.json"
