@@ -1,0 +1,18 @@
+# Define the remote host and service name
+$remoteHost = "RemoteHostName"
+$serviceName = "ServiceName"
+
+# Check if the service is running on the remote host
+Invoke-Command -ComputerName $remoteHost -ScriptBlock {
+    param ($serviceName)
+    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if ($service) {
+        if ($service.Status -eq 'Running') {
+            Write-Output "The service '$serviceName' is running on $env:COMPUTERNAME."
+        } else {
+            Write-Output "The service '$serviceName' is not running on $env:COMPUTERNAME. Current status: $($service.Status)"
+        }
+    } else {
+        Write-Output "The service '$serviceName' was not found on $env:COMPUTERNAME."
+    }
+} -ArgumentList $serviceName
