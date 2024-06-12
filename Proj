@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- Define potential Visual Studio version paths -->
+    <VisualStudioVersion16Path>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v16.0\WebApplications\Microsoft.WebApplication.targets</VisualStudioVersion16Path>
+    <VisualStudioVersion17Path>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v17.0\WebApplications\Microsoft.WebApplication.targets</VisualStudioVersion17Path>
+  </PropertyGroup>
+
+  <Target Name="DetectVisualStudioVersion">
+    <!-- Check for the existence of the Visual Studio 17 path -->
+    <PropertyGroup>
+      <VisualStudioTargetsPath Condition="Exists('$(VisualStudioVersion17Path)')">$(VisualStudioVersion17Path)</VisualStudioTargetsPath>
+      <!-- Fallback to Visual Studio 16 if 17 is not found -->
+      <VisualStudioTargetsPath Condition="Exists('$(VisualStudioVersion16Path)') and '$(VisualStudioTargetsPath)' == ''">$(VisualStudioVersion16Path)</VisualStudioTargetsPath>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Ensure the detection target runs before importing -->
+  <Import Project="$(VisualStudioTargetsPath)" Condition="Exists('$(VisualStudioTargetsPath)')" BeforeTargets="Build" />
+
+  <!-- Other imports and elements -->
+</Project>
