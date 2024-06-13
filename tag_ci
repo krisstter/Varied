@@ -1,0 +1,9 @@
+example_job:
+  script:
+    - echo "This job runs under specified conditions."
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+      when: always
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
