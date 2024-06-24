@@ -1,0 +1,36 @@
+# Parameters
+$directory = "C:\path\to\search"
+$filePattern = "*.txt"
+$searchPattern = "pattern to search"
+
+# Function to search for the pattern in files
+function Search-PatternInFiles {
+    param (
+        [string]$directory,
+        [string]$filePattern,
+        [string]$searchPattern
+    )
+
+    # Get all files in the current directory matching the file pattern
+    $files = [System.IO.Directory]::GetFiles($directory, $filePattern)
+
+    # Iterate over each file
+    foreach ($file in $files) {
+        $fileContent = [System.IO.File]::ReadAllText($file)
+        
+        if ($fileContent -match $searchPattern) {
+            Write-Output "Pattern found in file: $file"
+        }
+    }
+
+    # Get all subdirectories
+    $subdirectories = [System.IO.Directory]::GetDirectories($directory)
+
+    # Recursively search in each subdirectory
+    foreach ($subdirectory in $subdirectories) {
+        Search-PatternInFiles -directory $subdirectory -filePattern $filePattern -searchPattern $searchPattern
+    }
+}
+
+# Start the search
+Search-PatternInFiles -directory $directory -filePattern $filePattern -searchPattern $searchPattern
