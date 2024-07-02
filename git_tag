@@ -1,0 +1,1 @@
+git for-each-ref --sort=-committerdate --format '%(committerdate:iso8601) %(refname:short)' refs/tags
