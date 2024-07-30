@@ -12,8 +12,9 @@ function Search-PatternInFiles {
     )
 
     # Get all files in the current directory matching the file pattern
-    $files = [System.IO.Directory]::GetFiles($directory, $filePattern)
-
+    $files = [System.IO.Directory]::GetFiles($directory, $filePattern) | Sort-Object {[System.IO.FileInfo]::new($_).LastWriteTime} -Descending
+             
+ 
     # Iterate over each file
     foreach ($file in $files) {
         $fileContent = [System.IO.File]::ReadAllText($file)
