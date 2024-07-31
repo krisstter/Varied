@@ -1,11 +1,33 @@
+# Define the script parameter for the new date
+param (
+    [string]$newDate
+)
+
 # Define the folder path containing the batch files
 $folderPath = "C:\Path\To\BatchFiles"
 
 # Define the pattern to search for "AsAt" followed by a date in YYYYMMDD format
-$pattern = "(?<=\bAsAt\s)\d{8}\b"
+$patternAsAt = "(?<=\bAsAt\s)\d{8}\b"
 
-# Define the new date to replace the old date
-$newDate = "20240815"
+# Define the pattern to search for "AsAtPrevious" followed by a date in YYYYMMDD format
+$patternAsAtPrevious = "(?<=\bAsAtPrevious\s)\d{8}\b"
+
+# Validate and convert the new date parameter to a date object
+try {
+    $newDateObj = Get-Date $newDate.Substring(0, 4), $newDate.Substring(4, 2), $newDate.Substring(6, 2)
+} catch {
+    Write-Error "Invalid date format. Please provide the date in YYYYMMDD format."
+    exit
+}
+
+# Determine if the new date is a Monday and set the previous date accordingly
+if ($newDateObj.DayOfWeek -eq 'Monday') {
+    # If Monday, set previous date to the last Friday
+    $newDatePrevious = $newDateObj.AddDays(-3).ToString("yyyyMMdd")
+} else {
+    # Otherwise, set previous date to the day before
+    $newDatePrevious = $newDateObj.AddDays(-1).ToString("yyyyMMdd")
+}
 
 # Get all batch files (*.bat) in the specified folder
 $batchFiles = Get-ChildItem -Path $folderPath -Filter *.bat
@@ -15,8 +37,13 @@ foreach ($file in $batchFiles) {
     # Read the file content
     $content = Get-Content -Path $file.FullName -Raw
 
-    # Replace the old date with the new date, only if preceded by "AsAt"
-    $newContent = $content -replace $pattern, $newDate
+    # Replace the "AsAt" date with the new date
+    $newContent = $content -replace $patternAsAt, $newDate
+
+    # If the file name contains "PNL", also replace the "AsAtPrevious" date
+    if ($file.Name -like "*PNL*") {
+        $newContent = $newContent -replace $patternAsAtPrevious, $newDatePrevious
+    }
 
     # Write the new content back to the file
     Set-Content -Path $file.FullName -Value $newContent
