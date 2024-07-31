@@ -14,7 +14,8 @@ $patternAsAtPrevious = "(?<=\bAsAtPrevious\s)\d{8}\b"
 
 # Validate and convert the new date parameter to a date object
 try {
-    $newDateObj = Get-Date $newDate.Substring(0, 4), $newDate.Substring(4, 2), $newDate.Substring(6, 2)
+    # Convert the new date string to a DateTime object
+    $newDateObj = [datetime]::ParseExact($newDate, "yyyyMMdd", $null)
 } catch {
     Write-Error "Invalid date format. Please provide the date in YYYYMMDD format."
     exit
