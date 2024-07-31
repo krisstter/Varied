@@ -1,0 +1,52 @@
+# Define the script parameters for the new date
+param (
+    [string]$newDate
+)
+
+# Define the root paths for source and destination
+$sourceRootPath = "C:\"
+$destinationRootPath = "D:\Backup\" # Example destination root path
+
+# Validate and convert the new date parameter to a date object
+try {
+    # Convert the new date string to a DateTime object
+    $newDateObj = [datetime]::ParseExact($newDate, "yyyyMMdd", $null)
+} catch {
+    Write-Error "Invalid date format. Please provide the date in YYYYMMDD format."
+    exit
+}
+
+# Determine the previous date (AsAtPrevious)
+if ($newDateObj.DayOfWeek -eq 'Monday') {
+    $previousDateObj = $newDateObj.AddDays(-3) # Previous Friday if newDate is Monday
+} else {
+    $previousDateObj = $newDateObj.AddDays(-1) # Previous day otherwise
+}
+
+# Convert the dates to string format
+$AsAt = $newDateObj.ToString("yyyyMMdd")
+$AsAtPrevious = $previousDateObj.ToString("yyyyMMdd")
+
+# Define the source and destination paths based on the dates
+$sourcePathAsAt = Join-Path -Path $sourceRootPath -ChildPath $AsAt
+$sourcePathAsAtPrevious = Join-Path -Path $sourceRootPath -ChildPath $AsAtPrevious
+$destinationPathAsAt = Join-Path -Path $destinationRootPath -ChildPath $AsAt
+$destinationPathAsAtPrevious = Join-Path -Path $destinationRootPath -ChildPath $AsAtPrevious
+
+# Function to copy files recursively
+function Copy-FilesRecursively {
+    param (
+        [string]$sourcePath,
+        [string]$destinationPath
+    )
+    if (Test-Path $sourcePath) {
+        Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
+        Write-Output "Copied files from $sourcePath to $destinationPath"
+    } else {
+        Write-Output "Source path $sourcePath does not exist."
+    }
+}
+
+# Copy files for both AsAt and AsAtPrevious
+Copy-FilesRecursively -sourcePath $sourcePathAsAt -destinationPath $destinationPathAsAt
+Copy-FilesRecursively -sourcePath $sourcePathAsAtPrevious -destinationPath $destinationPathAsAtPrevious
