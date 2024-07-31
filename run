@@ -1,0 +1,48 @@
+# Define the list of batch files to execute after the initial two
+$batchFiles = @("batch3.bat", "batch4.bat", "batch5.bat")
+
+# Define the COB parameter
+$cob = "YourCOBValue"  # Replace with the actual COB value
+
+# Function to execute a batch file and return the exit code
+function Execute-BatchFile {
+    param (
+        [string]$batchFile,
+        [string]$cobParam
+    )
+    
+    # Start the batch file process
+    $process = Start-Process -FilePath $batchFile -ArgumentList $cobParam -NoNewWindow -PassThru
+    $process.WaitForExit()
+
+    # Return the exit code of the batch file
+    return $process.ExitCode
+}
+
+# Run batch1 and batch2 simultaneously
+$batch1Job = Start-Job -ScriptBlock { Execute-BatchFile -batchFile "batch1.bat" -cobParam $using:cob }
+$batch2Job = Start-Job -ScriptBlock { Execute-BatchFile -batchFile "batch2.bat" -cobParam $using:cob }
+
+# Wait for both jobs to finish
+$results = Receive-Job -Job $batch1Job, $batch2Job -Wait -AutoRemoveJob
+
+# Check exit codes of batch1 and batch2
+$batch1Success = $results[0] -eq 0
+$batch2Success = $results[1] -eq 0
+
+if ($batch1Success -and $batch2Success) {
+    Write-Output "batch1.bat and batch2.bat completed successfully. Proceeding with the rest."
+
+    # Loop through each of the remaining batch files and execute them in sequence
+    foreach ($batchFile in $batchFiles) {
+        $exitCode = Execute-BatchFile -batchFile $batchFile -cobParam $cob
+        if ($exitCode -ne 0) {
+            Write-Output "$batchFile failed with exit code $exitCode. Stopping execution."
+            break
+        } else {
+            Write-Output "$batchFile completed successfully."
+        }
+    }
+} else {
+    Write-Output "batch1.bat or batch2.bat failed. Stopping execution."
+}
