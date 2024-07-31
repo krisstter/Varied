@@ -1,0 +1,26 @@
+# Define the folder path containing the batch files
+$folderPath = "C:\Path\To\BatchFiles"
+
+# Define the pattern to search for "AsAt" followed by a date in YYYYMMDD format
+$pattern = "(?<=\bAsAt\s)\d{8}\b"
+
+# Define the new date to replace the old date
+$newDate = "20240815"
+
+# Get all batch files (*.bat) in the specified folder
+$batchFiles = Get-ChildItem -Path $folderPath -Filter *.bat
+
+# Iterate over each batch file
+foreach ($file in $batchFiles) {
+    # Read the file content
+    $content = Get-Content -Path $file.FullName -Raw
+
+    # Replace the old date with the new date, only if preceded by "AsAt"
+    $newContent = $content -replace $pattern, $newDate
+
+    # Write the new content back to the file
+    Set-Content -Path $file.FullName -Value $newContent
+
+    # Output the file name that was processed
+    Write-Output "Updated file: $($file.Name)"
+}
