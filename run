@@ -1,27 +1,36 @@
+# Define the directory where the batch files are located
+$batchFileDirectory = "C:\Scripts"
+
 # Define the list of batch files to execute after the initial two
-$batchFiles = @("batch3.bat", "batch4.bat", "batch5.bat")
+$batchFiles = @(
+    Join-Path $batchFileDirectory "batch3.bat",
+    Join-Path $batchFileDirectory "batch4.bat",
+    Join-Path $batchFileDirectory "batch5.bat"
+)
 
-# Define the COB parameter
-$cob = "YourCOBValue"  # Replace with the actual COB value
-
-# Function to execute a batch file and return the exit code
+# Define the Execute-BatchFile function in the global scope
 function Execute-BatchFile {
     param (
-        [string]$batchFile,
-        [string]$cobParam
+        [string]$batchFile
     )
     
     # Start the batch file process
-    $process = Start-Process -FilePath $batchFile -ArgumentList $cobParam -NoNewWindow -PassThru
+    $process = Start-Process -FilePath $batchFile -NoNewWindow -PassThru
     $process.WaitForExit()
 
     # Return the exit code of the batch file
     return $process.ExitCode
 }
 
-# Run batch1 and batch2 simultaneously
-$batch1Job = Start-Job -ScriptBlock { Execute-BatchFile -batchFile "batch1.bat" -cobParam $using:cob }
-$batch2Job = Start-Job -ScriptBlock { Execute-BatchFile -batchFile "batch2.bat" -cobParam $using:cob }
+# Define a script block to execute the batch files
+$scriptBlock = {
+    param ($batchFile)
+    & ${function:Execute-BatchFile} $batchFile
+}
+
+# Run batch1 and batch2 simultaneously using jobs
+$batch1Job = Start-Job -ScriptBlock $scriptBlock -ArgumentList (Join-Path $batchFileDirectory "batch1.bat")
+$batch2Job = Start-Job -ScriptBlock $scriptBlock -ArgumentList (Join-Path $batchFileDirectory "batch2.bat")
 
 # Wait for both jobs to finish
 $results = Receive-Job -Job $batch1Job, $batch2Job -Wait -AutoRemoveJob
@@ -35,7 +44,7 @@ if ($batch1Success -and $batch2Success) {
 
     # Loop through each of the remaining batch files and execute them in sequence
     foreach ($batchFile in $batchFiles) {
-        $exitCode = Execute-BatchFile -batchFile $batchFile -cobParam $cob
+        $exitCode = Execute-BatchFile -batchFile $batchFile
         if ($exitCode -ne 0) {
             Write-Output "$batchFile failed with exit code $exitCode. Stopping execution."
             break
