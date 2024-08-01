@@ -1,10 +1,14 @@
 # Define the directory where the batch files are located
 $batchFileDirectory = "C:\Scripts"
 
-# Define the list of batch files to execute
-$batchFiles = @(
+# Define the first group of batch files to run simultaneously
+$batchGroup1 = @(
     Join-Path $batchFileDirectory "batch1.bat",
-    Join-Path $batchFileDirectory "batch2.bat",
+    Join-Path $batchFileDirectory "batch2.bat"
+)
+
+# Define the second group of batch files to run after the first group
+$batchGroup2 = @(
     Join-Path $batchFileDirectory "batch3.bat",
     Join-Path $batchFileDirectory "batch4.bat",
     Join-Path $batchFileDirectory "batch5.bat"
@@ -20,23 +24,51 @@ function Execute-BatchFile {
     return Start-Process -FilePath $batchFile -NoNewWindow -PassThru
 }
 
-# Create an array to hold process objects
-$processes = @()
+# Create arrays to hold process objects for each group
+$processesGroup1 = @()
+$processesGroup2 = @()
 
-# Start all batch files simultaneously
-foreach ($batchFile in $batchFiles) {
+# Start all batch files in the first group simultaneously
+foreach ($batchFile in $batchGroup1) {
     $process = Execute-BatchFile -batchFile $batchFile
-    $processes += $process
+    $processesGroup1 += $process
 }
 
-# Wait for all processes to complete
-foreach ($process in $processes) {
+# Wait for all processes in the first group to complete
+$allSucceeded = $true
+foreach ($process in $processesGroup1) {
     $process.WaitForExit()
     $exitCode = $process.ExitCode
     $batchFileName = $process.StartInfo.FileName
     if ($exitCode -ne 0) {
         Write-Output "$batchFileName failed with exit code $exitCode."
+        $allSucceeded = $false
     } else {
         Write-Output "$batchFileName completed successfully."
     }
+}
+
+# If all processes in the first group succeeded, start the second group
+if ($allSucceeded) {
+    Write-Output "All batch files in group 1 completed successfully. Proceeding with group 2."
+
+    # Start all batch files in the second group simultaneously
+    foreach ($batchFile in $batchGroup2) {
+        $process = Execute-BatchFile -batchFile $batchFile
+        $processesGroup2 += $process
+    }
+
+    # Wait for all processes in the second group to complete
+    foreach ($process in $processesGroup2) {
+        $process.WaitForExit()
+        $exitCode = $process.ExitCode
+        $batchFileName = $process.StartInfo.FileName
+        if ($exitCode -ne 0) {
+            Write-Output "$batchFileName failed with exit code $exitCode."
+        } else {
+            Write-Output "$batchFileName completed successfully."
+        }
+    }
+} else {
+    Write-Output "One or more batch files in group 1 failed. Group 2 will not be executed."
 }
