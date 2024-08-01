@@ -39,11 +39,19 @@ function Copy-FilesRecursively {
         [string]$sourcePath,
         [string]$destinationPath
     )
-    if (Test-Path $sourcePath) {
-        Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
-        Write-Output "Copied files from $sourcePath to $destinationPath"
+
+    # Check if the destination path already exists
+    if (Test-Path $destinationPath) {
+        Write-Output "Destination path $destinationPath already exists. Skipping copy."
     } else {
-        Write-Output "Source path $sourcePath does not exist."
+        # Check if the source path exists
+        if (Test-Path $sourcePath) {
+            # Copy files and folders recursively
+            Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
+            Write-Output "Copied files from $sourcePath to $destinationPath"
+        } else {
+            Write-Output "Source path $sourcePath does not exist. No files copied."
+        }
     }
 }
 
