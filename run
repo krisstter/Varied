@@ -1,8 +1,10 @@
 # Define the directory where the batch files are located
 $batchFileDirectory = "C:\Scripts"
 
-# Define the list of batch files to execute after the initial two
+# Define the list of batch files to execute
 $batchFiles = @(
+    Join-Path $batchFileDirectory "batch1.bat",
+    Join-Path $batchFileDirectory "batch2.bat",
     Join-Path $batchFileDirectory "batch3.bat",
     Join-Path $batchFileDirectory "batch4.bat",
     Join-Path $batchFileDirectory "batch5.bat"
@@ -14,40 +16,27 @@ function Execute-BatchFile {
         [string]$batchFile
     )
     
-    # Start the batch file process
-    $process = Start-Process -FilePath $batchFile -NoNewWindow -Wait -PassThru
-    
-    # Return the exit code of the batch file
-    return $process.ExitCode
+    # Start the batch file process and return the process object
+    return Start-Process -FilePath $batchFile -NoNewWindow -PassThru
 }
 
-# Execute batch1.bat
-$batch1Path = Join-Path $batchFileDirectory "batch1.bat"
-$batch1ExitCode = Execute-BatchFile -batchFile $batch1Path
+# Create an array to hold process objects
+$processes = @()
 
-if ($batch1ExitCode -ne 0) {
-    Write-Output "batch1.bat failed with exit code $batch1ExitCode. Stopping execution."
-    exit $batch1ExitCode
-}
-
-# Execute batch2.bat
-$batch2Path = Join-Path $batchFileDirectory "batch2.bat"
-$batch2ExitCode = Execute-BatchFile -batchFile $batch2Path
-
-if ($batch2ExitCode -ne 0) {
-    Write-Output "batch2.bat failed with exit code $batch2ExitCode. Stopping execution."
-    exit $batch2ExitCode
-}
-
-# If both batch1.bat and batch2.bat succeeded, execute remaining batch files
-Write-Output "batch1.bat and batch2.bat completed successfully. Proceeding with the rest."
-
+# Start all batch files simultaneously
 foreach ($batchFile in $batchFiles) {
-    $exitCode = Execute-BatchFile -batchFile $batchFile
+    $process = Execute-BatchFile -batchFile $batchFile
+    $processes += $process
+}
+
+# Wait for all processes to complete
+foreach ($process in $processes) {
+    $process.WaitForExit()
+    $exitCode = $process.ExitCode
+    $batchFileName = $process.StartInfo.FileName
     if ($exitCode -ne 0) {
-        Write-Output "$batchFile failed with exit code $exitCode. Stopping execution."
-        break
+        Write-Output "$batchFileName failed with exit code $exitCode."
     } else {
-        Write-Output "$batchFile completed successfully."
+        Write-Output "$batchFileName completed successfully."
     }
 }
