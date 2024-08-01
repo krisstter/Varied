@@ -8,24 +8,28 @@ $batchFiles = @(
     Join-Path $batchFileDirectory "batch5.bat"
 )
 
-# Define the Execute-BatchFile function in the global scope
-function Execute-BatchFile {
+# Define a script block to execute the batch files, including the function
+$scriptBlock = {
     param (
         [string]$batchFile
     )
     
-    # Start the batch file process
-    $process = Start-Process -FilePath $batchFile -NoNewWindow -PassThru
-    $process.WaitForExit()
+    # Define the Execute-BatchFile function within the script block
+    function Execute-BatchFile {
+        param (
+            [string]$batchFile
+        )
+        
+        # Start the batch file process
+        $process = Start-Process -FilePath $batchFile -NoNewWindow -PassThru
+        $process.WaitForExit()
 
-    # Return the exit code of the batch file
-    return $process.ExitCode
-}
+        # Return the exit code of the batch file
+        return $process.ExitCode
+    }
 
-# Define a script block to execute the batch files
-$scriptBlock = {
-    param ($batchFile)
-    & ${function:Execute-BatchFile} $batchFile
+    # Call the function with the provided batch file
+    Execute-BatchFile -batchFile $batchFile
 }
 
 # Run batch1 and batch2 simultaneously using jobs
