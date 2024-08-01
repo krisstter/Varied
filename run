@@ -8,54 +8,46 @@ $batchFiles = @(
     Join-Path $batchFileDirectory "batch5.bat"
 )
 
-# Define a script block to execute the batch files, including the function
-$scriptBlock = {
+# Define the Execute-BatchFile function
+function Execute-BatchFile {
     param (
         [string]$batchFile
     )
     
-    # Define the Execute-BatchFile function within the script block
-    function Execute-BatchFile {
-        param (
-            [string]$batchFile
-        )
-        
-        # Start the batch file process
-        $process = Start-Process -FilePath $batchFile -NoNewWindow -PassThru
-        $process.WaitForExit()
-
-        # Return the exit code of the batch file
-        return $process.ExitCode
-    }
-
-    # Call the function with the provided batch file
-    Execute-BatchFile -batchFile $batchFile
+    # Start the batch file process
+    $process = Start-Process -FilePath $batchFile -NoNewWindow -Wait -PassThru
+    
+    # Return the exit code of the batch file
+    return $process.ExitCode
 }
 
-# Run batch1 and batch2 simultaneously using jobs
-$batch1Job = Start-Job -ScriptBlock $scriptBlock -ArgumentList (Join-Path $batchFileDirectory "batch1.bat")
-$batch2Job = Start-Job -ScriptBlock $scriptBlock -ArgumentList (Join-Path $batchFileDirectory "batch2.bat")
+# Execute batch1.bat
+$batch1Path = Join-Path $batchFileDirectory "batch1.bat"
+$batch1ExitCode = Execute-BatchFile -batchFile $batch1Path
 
-# Wait for both jobs to finish
-$results = Receive-Job -Job $batch1Job, $batch2Job -Wait -AutoRemoveJob
+if ($batch1ExitCode -ne 0) {
+    Write-Output "batch1.bat failed with exit code $batch1ExitCode. Stopping execution."
+    exit $batch1ExitCode
+}
 
-# Check exit codes of batch1 and batch2
-$batch1Success = $results[0] -eq 0
-$batch2Success = $results[1] -eq 0
+# Execute batch2.bat
+$batch2Path = Join-Path $batchFileDirectory "batch2.bat"
+$batch2ExitCode = Execute-BatchFile -batchFile $batch2Path
 
-if ($batch1Success -and $batch2Success) {
-    Write-Output "batch1.bat and batch2.bat completed successfully. Proceeding with the rest."
+if ($batch2ExitCode -ne 0) {
+    Write-Output "batch2.bat failed with exit code $batch2ExitCode. Stopping execution."
+    exit $batch2ExitCode
+}
 
-    # Loop through each of the remaining batch files and execute them in sequence
-    foreach ($batchFile in $batchFiles) {
-        $exitCode = Execute-BatchFile -batchFile $batchFile
-        if ($exitCode -ne 0) {
-            Write-Output "$batchFile failed with exit code $exitCode. Stopping execution."
-            break
-        } else {
-            Write-Output "$batchFile completed successfully."
-        }
+# If both batch1.bat and batch2.bat succeeded, execute remaining batch files
+Write-Output "batch1.bat and batch2.bat completed successfully. Proceeding with the rest."
+
+foreach ($batchFile in $batchFiles) {
+    $exitCode = Execute-BatchFile -batchFile $batchFile
+    if ($exitCode -ne 0) {
+        Write-Output "$batchFile failed with exit code $exitCode. Stopping execution."
+        break
+    } else {
+        Write-Output "$batchFile completed successfully."
     }
-} else {
-    Write-Output "batch1.bat or batch2.bat failed. Stopping execution."
 }
