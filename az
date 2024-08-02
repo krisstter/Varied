@@ -14,3 +14,28 @@ if (-not (Get-Module -ListAvailable -Name Az)) {
 } else {
     Write-Output "Az module is already installed."
 }
+
+
+# Login to Azure account
+Connect-AzAccount
+
+# Get a list of all VMs and their statuses
+$vms = Get-AzVM -Status
+
+# Iterate through each VM
+foreach ($vm in $vms) {
+    $vmName = $vm.Name
+    $resourceGroupName = $vm.ResourceGroupName
+    $vmStatus = $vm.PowerState -replace "PowerState/", ""
+
+    Write-Output "VM Name: $vmName, Status: $vmStatus"
+
+    # Check if the VM is not running
+    if ($vmStatus -ne "running") {
+        Write-Output "Starting VM: $vmName..."
+        Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName
+        Write-Output "VM $vmName started."
+    } else {
+        Write-Output "VM $vmName is already running."
+    }
+}
