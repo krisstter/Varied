@@ -55,3 +55,22 @@ $tokenData = @{
 }
 
 $tokenData | ConvertTo-Json | Set-Content -Path "azureToken.json"
+
+
+# Login to Azure account and capture the context
+$context = Connect-AzAccount
+
+# Extract the token from the context
+$graphToken = (Get-AzAccessToken).Token
+
+# Optional: Display the token (be careful with sensitive information)
+# Write-Output "Access Token: $graphToken"
+
+# Save the token details to a file (e.g., JSON format)
+$tokenData = @{
+    AccessToken = $graphToken
+    AcquiredAt = (Get-Date).ToUniversalTime()
+    ExpiresIn = 3600 # typically 1 hour (3600 seconds)
+}
+
+$tokenData | ConvertTo-Json | Set-Content -Path "azureToken.json"
