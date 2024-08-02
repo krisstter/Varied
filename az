@@ -1,41 +1,40 @@
-# Check if Az module is installed
-if (-not (Get-Module -ListAvailable -Name Az)) {
-    Write-Output "Az module not found. Installing..."
-    
-    # Ensure the latest NuGet provider is installed
-    if (-not (Get-PackageProvider -ListAvailable -Name NuGet)) {
-        Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
-    }
-
-    # Install the Az module
-    Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser
-
-    Write-Output "Az module installed successfully."
-} else {
-    Write-Output "Az module is already installed."
-}
-
-
 # Login to Azure account
 Connect-AzAccount
 
-# Get a list of all VMs and their statuses
-$vms = Get-AzVM -Status
+# Define the subscription IDs
+$subscriptionIds = @("subscriptionId1", "subscriptionId2")
 
-# Iterate through each VM
-foreach ($vm in $vms) {
-    $vmName = $vm.Name
-    $resourceGroupName = $vm.ResourceGroupName
-    $vmStatus = $vm.PowerState -replace "PowerState/", ""
+# Define the VM name prefixes to check
+$vmNamePrefixes = @("nstm", "nldn")
 
-    Write-Output "VM Name: $vmName, Status: $vmStatus"
+# Loop through each subscription
+foreach ($subscriptionId in $subscriptionIds) {
+    # Set the current subscription
+    Set-AzContext -SubscriptionId $subscriptionId
 
-    # Check if the VM is not running
-    if ($vmStatus -ne "running") {
-        Write-Output "Starting VM: $vmName..."
-        Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName
-        Write-Output "VM $vmName started."
-    } else {
-        Write-Output "VM $vmName is already running."
+    Write-Output "Checking VMs in Subscription: $subscriptionId"
+
+    # Get a list of all VMs and their statuses
+    $vms = Get-AzVM -Status
+
+    # Iterate through each VM
+    foreach ($vm in $vms) {
+        $vmName = $vm.Name
+        $resourceGroupName = $vm.ResourceGroupName
+        $vmStatus = $vm.PowerState -replace "PowerState/", ""
+
+        # Check if the VM name starts with the specified prefixes
+        if ($vmName -like "$($vmNamePrefixes[0])*" -or $vmName -like "$($vmNamePrefixes[1])*") {
+            Write-Output "VM Name: $vmName, Status: $vmStatus"
+
+            # Check if the VM is not running
+            if ($vmStatus -ne "running") {
+                Write-Output "Starting VM: $vmName..."
+                Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName
+                Write-Output "VM $vmName started."
+            } else {
+                Write-Output "VM $vmName is already running."
+            }
+        }
     }
 }
