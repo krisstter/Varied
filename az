@@ -38,3 +38,20 @@ foreach ($subscriptionId in $subscriptionIds) {
         }
     }
 }
+
+
+# Authenticate and save the context
+$context = Connect-AzAccount
+
+# Get the access token for the context
+$token = $context.TokenCache.ReadItems() | Where-Object { $_.TenantId -eq $context.Tenant.Id } | Select-Object -First 1
+
+# Save the token details to a file (e.g., JSON format)
+$tokenData = @{
+    AccessToken = $token.AccessToken
+    ExpiresOn = $token.ExpiresOn
+    TenantId = $token.TenantId
+    UserId = $token.UserId
+}
+
+$tokenData | ConvertTo-Json | Set-Content -Path "azureToken.json"
