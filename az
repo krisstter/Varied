@@ -1,0 +1,16 @@
+# Check if Az module is installed
+if (-not (Get-Module -ListAvailable -Name Az)) {
+    Write-Output "Az module not found. Installing..."
+    
+    # Ensure the latest NuGet provider is installed
+    if (-not (Get-PackageProvider -ListAvailable -Name NuGet)) {
+        Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+    }
+
+    # Install the Az module
+    Install-Module -Name Az -AllowClobber -Force -Scope CurrentUser
+
+    Write-Output "Az module installed successfully."
+} else {
+    Write-Output "Az module is already installed."
+}
