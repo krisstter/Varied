@@ -1,0 +1,12 @@
+DECLARE
+    l_name VARCHAR2(100) := 'MyModelName';
+    l_version VARCHAR2(100) := '1.0';
+    l_xml XMLTYPE := XMLTYPE('<root><element>Sample Data</element></root>');
+BEGIN
+    MODELMAP_CACHE_PKG.write_modelmap(
+        p_name    => l_name,
+        p_version => l_version,
+        p_xml     => l_xml
+    );
+END;
+/
