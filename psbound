@@ -1,20 +1,15 @@
 param (
-    [Parameter(Mandatory = $true)]
     [ValidateSet("uat", "prod", "uat-azure")]
     [string]$env,
 
-    [Parameter(Mandatory = $true)]
     [ValidateSet("runtime", "deploy")]
     [string]$scope,
 
-    [Parameter(Mandatory = $true)]
     [string]$key
 )
 
 # Check if all mandatory parameters are provided
-if (-not $PSBoundParameters.ContainsKey('env') -or
-    -not $PSBoundParameters.ContainsKey('scope') -or
-    -not $PSBoundParameters.ContainsKey('key')) {
+if ([string]::IsNullOrEmpty($env) -or [string]::IsNullOrEmpty($scope) -or [string]::IsNullOrEmpty($key)) {
     Write-Host "Error: All three parameters are mandatory." -ForegroundColor Red
     Write-Host "Usage: .\script.ps1 -env <uat|prod|uat-azure> -scope <runtime|deploy> -key <key_value>"
     Write-Host "Example combinations:"
