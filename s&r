@@ -1,0 +1,22 @@
+# Load the .NET libraries
+Add-Type -AssemblyName "System.IO"
+
+# Define the root directory to start the search
+$rootDir = "C:\Path\To\Your\Directory"
+
+# Define the cutoff date (28 days ago)
+$cutoffDate = (Get-Date).AddDays(-28)
+
+# Recursively search for files older than the cutoff date and delete them
+[System.IO.Directory]::EnumerateFiles($rootDir, "*", [System.IO.SearchOption]::AllDirectories) | ForEach-Object {
+    $file = $_
+    $fileInfo = New-Object System.IO.FileInfo($file)
+    if ($fileInfo.LastWriteTime -lt $cutoffDate) {
+        try {
+            Remove-Item $file -Force
+            Write-Host "Deleted: $file"
+        } catch {
+            Write-Host "Failed to delete: $file - Error: $_"
+        }
+    }
+}
