@@ -1,0 +1,33 @@
+image: mcr.microsoft.com/dotnet/sdk:7.0  # Use the .NET SDK Docker image suitable for your needs
+
+before_script:
+  - powershell -Command "
+    \$SourceName = 'MySourceName';
+    \$SourceUrl = 'https://my-source-url.com/nuget';
+    
+    # Check if the source exists
+    \$sourceExists = dotnet nuget list source | Select-String -Pattern \$SourceName;
+    
+    if (-not \$sourceExists) {
+        # Add the source if it doesn't exist
+        dotnet nuget add source \$SourceUrl --name \$SourceName;
+        Write-Host 'NuGet source \"\$SourceName\" added.';
+    } else {
+        Write-Host 'NuGet source \"\$SourceName\" already exists.';
+    }
+  "
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  script:
+    - dotnet restore
+    - dotnet build --configuration Release
+
+test:
+  stage: test
+  script:
+    - dotnet test --no-build --verbosity normal
