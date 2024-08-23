@@ -112,12 +112,18 @@ namespace RestartToolService
 
         private bool ShouldRunToday(DayOfWeek currentDayOfWeek)
         {
-            return _scheduleType switch
+            if (_scheduleType == "MondayOnly")
             {
-                "MondayOnly" => currentDayOfWeek == DayOfWeek.Monday,
-                "Weekdays" => currentDayOfWeek is >= DayOfWeek.Monday and <= DayOfWeek.Friday,
-                _ => false
-            };
+                return currentDayOfWeek == DayOfWeek.Monday;
+            }
+            else if (_scheduleType == "Weekdays")
+            {
+                return currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday;
+            }
+            else
+            {
+                throw new InvalidOperationException("Invalid ScheduleType configuration.");
+            }
         }
 
         private DateTime GetNextScheduledRunTime(DateTime currentTime)
@@ -138,13 +144,29 @@ namespace RestartToolService
 
         private DayOfWeek GetNextScheduledDay(DayOfWeek currentDayOfWeek)
         {
-            return _scheduleType switch
+            if (_scheduleType == "MondayOnly")
             {
-                "MondayOnly" => currentDayOfWeek < DayOfWeek.Monday ? DayOfWeek.Monday : DayOfWeek.Monday + 7,
-                "Weekdays" when currentDayOfWeek is >= DayOfWeek.Monday and < DayOfWeek.Friday => currentDayOfWeek + 1,
-                "Weekdays" when currentDayOfWeek == DayOfWeek.Friday => DayOfWeek.Monday,
-                _ => throw new InvalidOperationException("Invalid ScheduleType configuration.")
-            };
+                return currentDayOfWeek < DayOfWeek.Monday ? DayOfWeek.Monday : DayOfWeek.Monday + 7;
+            }
+            else if (_scheduleType == "Weekdays")
+            {
+                if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek < DayOfWeek.Friday)
+                {
+                    return currentDayOfWeek + 1;
+                }
+                else if (currentDayOfWeek == DayOfWeek.Friday)
+                {
+                    return DayOfWeek.Monday;
+                }
+                else
+                {
+                    throw new InvalidOperationException("Invalid ScheduleType configuration.");
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("Invalid ScheduleType configuration.");
+            }
         }
 
         private void RestartTool()
