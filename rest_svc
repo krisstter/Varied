@@ -17,6 +17,7 @@ namespace RestartToolService
         private TimeSpan _scheduleTime;
         private string _scheduleType;
         private bool _alreadyTriggeredToday;
+        private const int OnDemandCommand = 128; // Custom command value for on-demand execution
 
         public RestartToolService()
         {
@@ -39,6 +40,13 @@ namespace RestartToolService
                 };
                 _timer.Elapsed += OnElapsedTime;
                 _timer.Start();
+
+                DateTime currentTime = DateTime.Now;
+                Log.Info($"Current time: {currentTime}");
+
+                DateTime nextScheduledRun = GetNextScheduledRunTime(currentTime);
+                Log.Info($"Next scheduled run time: {nextScheduledRun}");
+
                 Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime}.");
             }
             catch (Exception ex)
@@ -52,6 +60,16 @@ namespace RestartToolService
         {
             Log.Info("Service stopped.");
             _timer?.Stop();
+        }
+
+        protected override void OnCustomCommand(int command)
+        {
+            if (command == OnDemandCommand)
+            {
+                Log.Info("On-demand execution triggered.");
+                RestartTool();
+            }
+            base.OnCustomCommand(command);
         }
 
         private void LoadConfig()
@@ -77,10 +95,8 @@ namespace RestartToolService
             var currentTime = DateTime.Now.TimeOfDay;
             var currentDayOfWeek = DateTime.Now.DayOfWeek;
 
-            // Determine if the tool should run based on the schedule type
             if (ShouldRunToday(currentDayOfWeek))
             {
-                // Check if the current time is within the scheduled time window and the tool hasn't been triggered today
                 if (!_alreadyTriggeredToday && currentTime >= _scheduleTime && currentTime < _scheduleTime.Add(TimeSpan.FromMinutes(1)))
                 {
                     _alreadyTriggeredToday = true;
@@ -88,7 +104,6 @@ namespace RestartToolService
                 }
             }
 
-            // Reset the flag at midnight
             if (currentTime.TotalSeconds < 60)
             {
                 _alreadyTriggeredToday = false;
@@ -97,13 +112,54 @@ namespace RestartToolService
 
         private bool ShouldRunToday(DayOfWeek currentDayOfWeek)
         {
-            // Determine if the tool should run today based on the ScheduleType
             return _scheduleType switch
             {
                 "MondayOnly" => currentDayOfWeek == DayOfWeek.Monday,
                 "Weekdays" => currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday,
                 _ => false
             };
+        }
+
+        private DateTime GetNextScheduledRunTime(DateTime currentTime)
+        {
+            DateTime scheduledTimeToday = currentTime.Date.Add(_scheduleTime);
+
+            if (ShouldRunToday(currentTime.DayOfWeek) && currentTime.TimeOfDay < _scheduleTime)
+            {
+                return scheduledTimeToday;
+            }
+
+            // If the scheduled time has already passed today, calculate the next available scheduled time
+            DayOfWeek nextDay = GetNextScheduledDay(currentTime.DayOfWeek);
+            DateTime nextScheduledRun = currentTime.Date.AddDays((int)nextDay - (int)currentTime.DayOfWeek).Add(_scheduleTime);
+
+            return nextScheduledRun;
+        }
+
+        private DayOfWeek GetNextScheduledDay(DayOfWeek currentDayOfWeek)
+        {
+            // Determine the next day based on the schedule type
+            if (_scheduleType == "MondayOnly")
+            {
+                return DayOfWeek.Monday > currentDayOfWeek ? DayOfWeek.Monday : DayOfWeek.Monday + 7;
+            }
+            else if (_scheduleType == "Weekdays")
+            {
+                if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek < DayOfWeek.Friday)
+                {
+                    return currentDayOfWeek + 1;
+                }
+                else if (currentDayOfWeek == DayOfWeek.Friday)
+                {
+                    return DayOfWeek.Monday;
+                }
+                else
+                {
+                    return DayOfWeek.Monday;
+                }
+            }
+
+            throw new InvalidOperationException("Invalid ScheduleType configuration.");
         }
 
         private void RestartTool()
@@ -114,7 +170,7 @@ namespace RestartToolService
                 var processStartInfo = new ProcessStartInfo
                 {
                     FileName = _restartToolPath,
-                    Arguments = $"\"{_restartToolConfigPath}\"", // Passing the path to restartool.json as an argument
+                    Arguments = $"\"{_restartToolConfigPath}\"", // Passing the path to restarttool.json as an argument
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
