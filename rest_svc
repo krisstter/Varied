@@ -21,7 +21,7 @@ namespace RestartToolService
 
         public RestartToolService()
         {
-            InitializeComponent();
+            // Initialize components if needed
         }
 
         protected override void OnStart(string[] args)
@@ -42,12 +42,12 @@ namespace RestartToolService
                 _timer.Start();
 
                 DateTime currentTime = DateTime.Now;
-                Log.Info($"Current time: {currentTime:HH:mm:ss}");
+                Log.Info($"Current time: {currentTime}");
 
                 DateTime nextScheduledRun = GetNextScheduledRunTime(currentTime);
-                Log.Info($"Next scheduled run time: {nextScheduledRun:HH:mm:ss}");
+                Log.Info($"Next scheduled run time: {nextScheduledRun}");
 
-                Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime:HH\\:mm\\:ss}.");
+                Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime}.");
             }
             catch (Exception ex)
             {
@@ -112,18 +112,12 @@ namespace RestartToolService
 
         private bool ShouldRunToday(DayOfWeek currentDayOfWeek)
         {
-            if (_scheduleType == "MondayOnly")
+            return _scheduleType switch
             {
-                return currentDayOfWeek == DayOfWeek.Monday;
-            }
-            else if (_scheduleType == "Weekdays")
-            {
-                return currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday;
-            }
-            else
-            {
-                throw new InvalidOperationException("Invalid ScheduleType configuration.");
-            }
+                "MondayOnly" => currentDayOfWeek == DayOfWeek.Monday,
+                "Weekdays" => currentDayOfWeek is >= DayOfWeek.Monday and <= DayOfWeek.Friday,
+                _ => false
+            };
         }
 
         private DateTime GetNextScheduledRunTime(DateTime currentTime)
@@ -144,29 +138,13 @@ namespace RestartToolService
 
         private DayOfWeek GetNextScheduledDay(DayOfWeek currentDayOfWeek)
         {
-            if (_scheduleType == "MondayOnly")
+            return _scheduleType switch
             {
-                return currentDayOfWeek < DayOfWeek.Monday ? DayOfWeek.Monday : DayOfWeek.Monday + 7;
-            }
-            else if (_scheduleType == "Weekdays")
-            {
-                if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek < DayOfWeek.Friday)
-                {
-                    return currentDayOfWeek + 1;
-                }
-                else if (currentDayOfWeek == DayOfWeek.Friday)
-                {
-                    return DayOfWeek.Monday;
-                }
-                else
-                {
-                    throw new InvalidOperationException("Invalid ScheduleType configuration.");
-                }
-            }
-            else
-            {
-                throw new InvalidOperationException("Invalid ScheduleType configuration.");
-            }
+                "MondayOnly" => currentDayOfWeek < DayOfWeek.Monday ? DayOfWeek.Monday : DayOfWeek.Monday + 7,
+                "Weekdays" when currentDayOfWeek is >= DayOfWeek.Monday and < DayOfWeek.Friday => currentDayOfWeek + 1,
+                "Weekdays" when currentDayOfWeek == DayOfWeek.Friday => DayOfWeek.Monday,
+                _ => throw new InvalidOperationException("Invalid ScheduleType configuration.")
+            };
         }
 
         private void RestartTool()
