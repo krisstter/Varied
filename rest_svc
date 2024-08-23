@@ -1,0 +1,121 @@
+using System;
+using System.Configuration;
+using System.Diagnostics;
+using System.ServiceProcess;
+using System.Timers;
+using log4net;
+using log4net.Config;
+
+namespace RestartToolService
+{
+    public partial class RestartToolService : ServiceBase
+    {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(RestartToolService));
+        private Timer _timer;
+        private string _restartToolPath;
+        private string _restartToolConfigPath;
+        private TimeSpan _scheduleTime;
+        private bool _alreadyTriggeredToday;
+
+        public RestartToolService()
+        {
+            InitializeComponent();
+        }
+
+        protected override void OnStart(string[] args)
+        {
+            XmlConfigurator.Configure();
+            Log.Info("Service started.");
+
+            try
+            {
+                LoadConfig();
+
+                _timer = new Timer
+                {
+                    Interval = 60000, // Check every minute
+                    AutoReset = true
+                };
+                _timer.Elapsed += OnElapsedTime;
+                _timer.Start();
+                Log.Info($"Service scheduled to run daily at {_scheduleTime}, Monday to Friday.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Error during service start.", ex);
+                throw;
+            }
+        }
+
+        protected override void OnStop()
+        {
+            Log.Info("Service stopped.");
+            _timer?.Stop();
+        }
+
+        private void LoadConfig()
+        {
+            try
+            {
+                _restartToolPath = ConfigurationManager.AppSettings["RestartToolPath"];
+                _restartToolConfigPath = ConfigurationManager.AppSettings["RestartToolConfigPath"];
+                _scheduleTime = TimeSpan.Parse(ConfigurationManager.AppSettings["ScheduleTime"]);
+
+                Log.Info("Configuration loaded successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Error loading configuration.", ex);
+                throw;
+            }
+        }
+
+        private void OnElapsedTime(object source, ElapsedEventArgs e)
+        {
+            var currentTime = DateTime.Now.TimeOfDay;
+            var currentDayOfWeek = DateTime.Now.DayOfWeek;
+
+            // Check if today is a weekday (Monday to Friday)
+            if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday)
+            {
+                // Check if the current time is within the scheduled time window and the tool hasn't been triggered today
+                if (!_alreadyTriggeredToday && currentTime >= _scheduleTime && currentTime < _scheduleTime.Add(TimeSpan.FromMinutes(1)))
+                {
+                    _alreadyTriggeredToday = true;
+                    RestartTool();
+                }
+            }
+
+            // Reset the flag at midnight
+            if (currentTime.TotalSeconds < 60)
+            {
+                _alreadyTriggeredToday = false;
+            }
+        }
+
+        private void RestartTool()
+        {
+            try
+            {
+                Log.Info($"Restarting tool: {_restartToolPath} with config: {_restartToolConfigPath}");
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = _restartToolPath,
+                    Arguments = $"\"{_restartToolConfigPath}\"", // Passing the path to restartool.json as an argument
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(processStartInfo))
+                {
+                    process.WaitForExit();
+                }
+                Log.Info("RestartTool executed successfully.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Error during RestartTool execution.", ex);
+            }
+        }
+    }
+}
