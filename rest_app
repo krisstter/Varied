@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <configuration>
   <configSections>
+    <!-- Configuration for log4net logging -->
     <section name="log4net" type="log4net.Config.Log4NetConfigurationSectionHandler, log4net" />
   </configSections>
 
   <appSettings>
+    <!-- Path to the RestartTool executable -->
     <add key="RestartToolPath" value="C:\path\to\restarttool.exe" />
+
+    <!-- Path to the RestartTool configuration file -->
     <add key="RestartToolConfigPath" value="C:\path\to\restarttool.json" />
+
+    <!-- Scheduled time to run the tool (format: HH:mm:ss) -->
     <add key="ScheduleTime" value="10:00:00" />
+
+    <!-- Schedule type: "MondayOnly" or "Weekdays" -->
+    <add key="ScheduleType" value="MondayOnly" />
   </appSettings>
 
   <log4net>
