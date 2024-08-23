@@ -42,12 +42,12 @@ namespace RestartToolService
                 _timer.Start();
 
                 DateTime currentTime = DateTime.Now;
-                Log.Info($"Current time: {currentTime}");
+                Log.Info($"Current time: {currentTime:HH:mm:ss}");
 
                 DateTime nextScheduledRun = GetNextScheduledRunTime(currentTime);
-                Log.Info($"Next scheduled run time: {nextScheduledRun}");
+                Log.Info($"Next scheduled run time: {nextScheduledRun:HH:mm:ss}");
 
-                Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime}.");
+                Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime:HH\\:mm\\:ss}.");
             }
             catch (Exception ex)
             {
@@ -115,7 +115,7 @@ namespace RestartToolService
             return _scheduleType switch
             {
                 "MondayOnly" => currentDayOfWeek == DayOfWeek.Monday,
-                "Weekdays" => currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday,
+                "Weekdays" => currentDayOfWeek is >= DayOfWeek.Monday and <= DayOfWeek.Friday,
                 _ => false
             };
         }
@@ -138,28 +138,13 @@ namespace RestartToolService
 
         private DayOfWeek GetNextScheduledDay(DayOfWeek currentDayOfWeek)
         {
-            // Determine the next day based on the schedule type
-            if (_scheduleType == "MondayOnly")
+            return _scheduleType switch
             {
-                return DayOfWeek.Monday > currentDayOfWeek ? DayOfWeek.Monday : DayOfWeek.Monday + 7;
-            }
-            else if (_scheduleType == "Weekdays")
-            {
-                if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek < DayOfWeek.Friday)
-                {
-                    return currentDayOfWeek + 1;
-                }
-                else if (currentDayOfWeek == DayOfWeek.Friday)
-                {
-                    return DayOfWeek.Monday;
-                }
-                else
-                {
-                    return DayOfWeek.Monday;
-                }
-            }
-
-            throw new InvalidOperationException("Invalid ScheduleType configuration.");
+                "MondayOnly" => currentDayOfWeek < DayOfWeek.Monday ? DayOfWeek.Monday : DayOfWeek.Monday + 7,
+                "Weekdays" when currentDayOfWeek is >= DayOfWeek.Monday and < DayOfWeek.Friday => currentDayOfWeek + 1,
+                "Weekdays" when currentDayOfWeek == DayOfWeek.Friday => DayOfWeek.Monday,
+                _ => throw new InvalidOperationException("Invalid ScheduleType configuration.")
+            };
         }
 
         private void RestartTool()
