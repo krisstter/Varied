@@ -1,0 +1,40 @@
+private bool ShouldRunToday(DayOfWeek currentDayOfWeek)
+{
+    switch (_scheduleType)
+    {
+        case "SundayOnly":
+            return currentDayOfWeek == DayOfWeek.Sunday;
+
+        case "Weekdays":
+            return currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday;
+
+        default:
+            return false;
+    }
+}
+
+private DayOfWeek GetNextScheduledDay(DayOfWeek currentDayOfWeek)
+{
+    switch (_scheduleType)
+    {
+        case "SundayOnly":
+            return DayOfWeek.Sunday > currentDayOfWeek ? DayOfWeek.Sunday : DayOfWeek.Sunday + 7;
+
+        case "Weekdays":
+            if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek < DayOfWeek.Friday)
+            {
+                return currentDayOfWeek + 1;
+            }
+            else if (currentDayOfWeek == DayOfWeek.Friday)
+            {
+                return DayOfWeek.Monday;
+            }
+            else
+            {
+                return DayOfWeek.Monday;
+            }
+
+        default:
+            throw new InvalidOperationException("Invalid ScheduleType configuration.");
+    }
+}
