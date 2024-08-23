@@ -15,6 +15,7 @@ namespace RestartToolService
         private string _restartToolPath;
         private string _restartToolConfigPath;
         private TimeSpan _scheduleTime;
+        private string _scheduleType;
         private bool _alreadyTriggeredToday;
 
         public RestartToolService()
@@ -38,7 +39,7 @@ namespace RestartToolService
                 };
                 _timer.Elapsed += OnElapsedTime;
                 _timer.Start();
-                Log.Info($"Service scheduled to run daily at {_scheduleTime}, Monday to Friday.");
+                Log.Info($"Service scheduled to run based on ScheduleType: {_scheduleType}, at {_scheduleTime}.");
             }
             catch (Exception ex)
             {
@@ -60,6 +61,7 @@ namespace RestartToolService
                 _restartToolPath = ConfigurationManager.AppSettings["RestartToolPath"];
                 _restartToolConfigPath = ConfigurationManager.AppSettings["RestartToolConfigPath"];
                 _scheduleTime = TimeSpan.Parse(ConfigurationManager.AppSettings["ScheduleTime"]);
+                _scheduleType = ConfigurationManager.AppSettings["ScheduleType"];
 
                 Log.Info("Configuration loaded successfully.");
             }
@@ -75,8 +77,8 @@ namespace RestartToolService
             var currentTime = DateTime.Now.TimeOfDay;
             var currentDayOfWeek = DateTime.Now.DayOfWeek;
 
-            // Check if today is a weekday (Monday to Friday)
-            if (currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday)
+            // Determine if the tool should run based on the schedule type
+            if (ShouldRunToday(currentDayOfWeek))
             {
                 // Check if the current time is within the scheduled time window and the tool hasn't been triggered today
                 if (!_alreadyTriggeredToday && currentTime >= _scheduleTime && currentTime < _scheduleTime.Add(TimeSpan.FromMinutes(1)))
@@ -91,6 +93,17 @@ namespace RestartToolService
             {
                 _alreadyTriggeredToday = false;
             }
+        }
+
+        private bool ShouldRunToday(DayOfWeek currentDayOfWeek)
+        {
+            // Determine if the tool should run today based on the ScheduleType
+            return _scheduleType switch
+            {
+                "MondayOnly" => currentDayOfWeek == DayOfWeek.Monday,
+                "Weekdays" => currentDayOfWeek >= DayOfWeek.Monday && currentDayOfWeek <= DayOfWeek.Friday,
+                _ => false
+            };
         }
 
         private void RestartTool()
