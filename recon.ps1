@@ -53,9 +53,11 @@ try {
     Write-Output "Starting loading of the main table from stage table: $(Get-Date)"
     $cmd.CommandText = "BEGIN Pkg_laredo_recon.load_data_main(:r_count); END;"
     $param = New-Object Oracle.ManagedDataAccess.Client.OracleParameter("r_count", [System.Data.ParameterDirection]::Output)
+    $param.OracleDbType = [Oracle.ManagedDataAccess.Client.OracleDbType]::Int32
     $cmd.Parameters.Add($param)
     $cmd.ExecuteNonQuery()
     $r_count = $param.Value
+    Write-Output "Number of rows processed: $r_count"
 
     # Get differences between Laredo and t_cache_external
     Write-Output "Getting the differences between Laredo and t_cache_external: $(Get-Date)"
