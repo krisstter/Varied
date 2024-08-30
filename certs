@@ -1,0 +1,49 @@
+# Define the path to the folder containing the certificates
+$certFolderPath = "C:\Path\To\Certs"
+
+# Define the remote machines
+$remoteMachines = @("RemoteMachine1", "RemoteMachine2", "RemoteMachine3")
+
+# Define the path on the remote machines where the certificates will be copied
+$remoteCertPath = "C$\Certs"
+
+# Function to install a certificate in the Trusted Root Certification Authorities store
+function Install-Certificate {
+    param (
+        [string]$certPath
+    )
+
+    Write-Host "Installing certificate: $certPath"
+    
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+    $cert.Import($certPath)
+
+    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store "Root", "LocalMachine"
+    $store.Open("ReadWrite")
+    $store.Add($cert)
+    $store.Close()
+    
+    Write-Host "Certificate installed: $certPath"
+}
+
+# Copy the certificates to the remote machines and install them
+foreach ($remoteMachine in $remoteMachines) {
+    Write-Host "Processing $remoteMachine"
+
+    # Copy the certificates to the remote machine
+    foreach ($certFile in Get-ChildItem -Path $certFolderPath -Filter *.cer) {
+        $remoteFilePath = "\\$remoteMachine\$remoteCertPath\$($certFile.Name)"
+        Write-Host "Copying $($certFile.FullName) to $remoteFilePath"
+        Copy-Item -Path $certFile.FullName -Destination $remoteFilePath -Force
+        
+        # Install the certificate on the remote machine
+        Invoke-Command -ComputerName $remoteMachine -ScriptBlock {
+            param ($remoteFilePath)
+            Install-Certificate -certPath $remoteFilePath
+        } -ArgumentList $remoteFilePath
+    }
+    
+    Write-Host "$remoteMachine processed."
+}
+
+Write-Host "All remote machines processed."
