@@ -1,0 +1,45 @@
+# Load the XML content
+$xmlContent = @"
+<root>
+    <server>
+        <properties>
+            <displayName>nldn11350dsq</displayName>
+            <name>nldn11350dsq</name>
+        </properties>
+    </server>
+    <server>
+        <properties>
+            <displayName>nldn11350dsq</displayName>
+            <name>nldn11350dsq</name>
+        </properties>
+    </server>
+    <server>
+        <properties>
+            <displayName>nldn11350dsq</displayName>
+            <name>nldn11350dsq</name>
+        </properties>
+    </server>
+    <server>
+        <properties>
+            <displayName>nldn11350dsq</displayName>
+            <name>nldn11350dsq</name>
+        </properties>
+    </server>
+</root>
+"@
+
+# Convert the string to XML object
+[xml]$xml = $xmlContent
+
+# Select all the <name> nodes
+$names = $xml.root.server.properties.name
+
+# Replace each name value with the format svr_$name_admin
+foreach ($name in $names) {
+    $newName = "svr_$($name)_admin"
+    $name.InnerText = $newName
+}
+
+# Display the updated XML content
+$xmlContentUpdated = $xml.OuterXml
+Write-Output $xmlContentUpdated
