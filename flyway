@@ -1,0 +1,1 @@
+flyway.url=jdbc:sqlserver://<SERVER>:<PORT>;databaseName=<DATABASE_NAME>;integratedSecurity=true
