@@ -1,0 +1,30 @@
+# Define SQL Server connection variables
+$server = "YourServerName"
+$database = "YourDatabaseName"
+$username = "YourUsername"
+$password = "YourPassword"
+$sqlFile = "C:\Path\To\Your\SQLScript.sql"
+
+# Define the sqlcmd command
+$sqlCmd = "sqlcmd -S $server -d $database -U $username -P $password -i $sqlFile"
+
+# Execute the sqlcmd command and capture output and errors
+try {
+    # Run sqlcmd and capture both standard output and errors
+    $output = & $sqlCmd 2>&1
+
+    # Check the exit code
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "SQLCmd encountered an error. Exit code: $LASTEXITCODE"
+        Write-Host "Error details: $output"
+        exit $LASTEXITCODE
+    } else {
+        Write-Host "SQLCmd executed successfully."
+        Write-Host $output
+    }
+}
+catch {
+    Write-Host "An error occurred while executing SQLCmd:"
+    Write-Host $_.Exception.Message
+    exit 1
+}
