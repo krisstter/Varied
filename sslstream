@@ -1,0 +1,43 @@
+using System;
+using System.Net.Security;
+using System.Net.Sockets;
+using log4net;
+using log4net.Config;
+
+class Program
+{
+    // Initialize the logger
+    private static readonly ILog log = LogManager.GetLogger(typeof(Program));
+
+    static void Main()
+    {
+        // Configure log4net
+        XmlConfigurator.Configure();
+
+        // Example of establishing a TLS connection
+        string server = "yourserver.com";
+        int port = 443;
+
+        try
+        {
+            using (var client = new TcpClient(server, port))
+            using (var sslStream = new SslStream(client.GetStream(), false))
+            {
+                sslStream.AuthenticateAsClient(server);
+                
+                // Log information about the connection
+                log.Info($"TLS connection established to {server}:{port}");
+                log.Info($"Protocol: {sslStream.SslProtocol}");
+                log.Info($"Cipher: {sslStream.CipherAlgorithm} - Strength: {sslStream.CipherStrength}");
+                log.Info($"Hash: {sslStream.HashAlgorithm} - Strength: {sslStream.HashStrength}");
+                log.Info($"Key exchange: {sslStream.KeyExchangeAlgorithm} - Strength: {sslStream.KeyExchangeStrength}");
+
+                // Additional code to use the connection
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Error("Exception occurred while establishing TLS connection", ex);
+        }
+    }
+}
