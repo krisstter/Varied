@@ -1,0 +1,47 @@
+# Define variables
+$plinkPath = "C:\path\to\plink.exe"   # Update with the correct path to plink
+$jsonParamFile = "C:\path\to\param_file.json"  # Update with your JSON parameter file path
+
+# Registry path for storing SSH host keys
+$regBasePath = "HKCU:\Software\SimonTatham\PuTTY"
+$regPath = "$regBasePath\SshHostKeys"
+
+# Check if the base registry path exists, if not, create it
+if (-not (Test-Path $regPath)) {
+    Write-Output "Registry path for SSH host keys not found, creating it..."
+    New-Item -Path $regBasePath -Name "SshHostKeys" -Force
+}
+
+# Read the JSON param file
+$userHostList = Get-Content $jsonParamFile | ConvertFrom-Json
+
+# Loop through each entry in the JSON and retrieve/store host key
+foreach ($entry in $userHostList) {
+    $connectionName = $entry.connectionName
+    $user = $entry.user
+    $remoteHost = $entry.remoteHost  # Changed variable name to remoteHost
+    $keyPath = $entry.keyPath
+
+    Write-Output "[$connectionName] Retrieving host key for $user@$remoteHost"
+
+    # Retrieve the host key by running plink in verbose mode
+    $plinkOutput = & $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit 2>&1
+
+    # Extract the host key from the plink output
+    if ($plinkOutput -match "The server's (rsa2|ecdsa-sha2-nistp256) key fingerprint is: ([a-zA-Z0-9:]+)") {
+        $hostKeyType = $matches[1]     # Key type (rsa2, ecdsa, etc.)
+        $hostKeyFingerprint = $matches[2]  # The actual key fingerprint
+
+        # Convert fingerprint to format used in PuTTY registry (PuTTY stores keys without colons)
+        $cleanedHostKey = $hostKeyFingerprint -replace ":", ""
+
+        # Prepare the registry key name (PuTTY uses this format: e.g., "rsa2@22:hostname")
+        $regKeyName = "$hostKeyType@22:$remoteHost"
+
+        # Add the host key to the Windows registry
+        Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
+        New-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey -PropertyType String
+    } else {
+        Write-Error "[$connectionName] Failed to retrieve host key for $user@$remoteHost"
+    }
+}
