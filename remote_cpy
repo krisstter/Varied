@@ -1,0 +1,32 @@
+# Define the remote hosts and local Deploy folder
+$remoteHosts = @("Host1", "Host2", "Host3")  # Add the list of remote hosts here
+$localDeployFolder = "C:\path\to\Deploy"
+$remoteCBMigrationFolder = "C:\CBmigration"
+
+# Loop through each remote host
+foreach ($host in $remoteHosts) {
+    try {
+        # Test if C:\CBmigration exists on the remote host
+        $folderExists = Invoke-Command -ComputerName $host -ScriptBlock {
+            Test-Path "C:\CBmigration"
+        }
+
+        if (-not $folderExists) {
+            # Create C:\CBmigration if it does not exist
+            Write-Host "C:\CBmigration does not exist on $host. Creating it..."
+            Invoke-Command -ComputerName $host -ScriptBlock {
+                New-Item -Path "C:\CBmigration" -ItemType Directory -Force
+            }
+            Write-Host "C:\CBmigration created on $host."
+        } else {
+            Write-Host "C:\CBmigration exists on $host. Proceeding with copy..."
+        }
+
+        # Copy the Deploy folder to C:\CBmigration\deploy
+        Copy-Item -Path $localDeployFolder -Destination "\\$host\$remoteCBMigrationFolder\deploy" -Recurse -Force
+        Write-Host "Deploy folder copied to $host successfully."
+
+    } catch {
+        Write-Host "Error occurred while processing $host: $_"
+    }
+}
