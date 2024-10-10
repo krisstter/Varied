@@ -1,0 +1,70 @@
+# Start the transcript for logging
+$logFile = "C:\path\to\log\pscp_transfer_log.txt"  # Update with your log file path
+Start-Transcript -Path $logFile -Append
+
+# Define variables
+$pscpPath = "C:\path\to\pscp.exe"  # Update with the correct path to pscp
+$sourceFile = "C:\path\to\your\file.txt"           # Update with the file you want to transfer
+$jsonParamFile = "C:\path\to\param_file.json"      # Update with your JSON parameter file path
+$destinationPath = "/path/on/unix/host"            # Update with the target directory on the UNIX server
+
+# Read the JSON param file
+$userHostList = Get-Content $jsonParamFile | ConvertFrom-Json
+
+Write-Debug "pscpPath: $pscpPath"
+Write-Debug "sourceFile: $sourceFile"
+Write-Debug "destinationPath: $destinationPath"
+Write-Debug "jsonParamFile: $jsonParamFile"
+
+# Automatically accept the SSH fingerprint
+$env:PLINK_OPTS = "-batch -no-antispoof"  # Set environment variable to automatically accept SSH fingerprint
+Write-Debug "PLINK_OPTS set to -batch -no-antispoof"
+
+# Loop through each entry in the JSON and perform the file transfer
+foreach ($entry in $userHostList) {
+    $connectionName = $entry.connectionName
+    $user = $entry.user
+    $host = $entry.host
+    $keyPath = $entry.keyPath
+
+    Write-Output "[$connectionName] Starting file transfer for $user@$host"
+    Write-Debug "[$connectionName] Connecting to $host with user: $user and key: $keyPath"
+    
+    # Execute pscp command to copy file to UNIX host using the specified private key
+    & $pscpPath -batch -i $keyPath -scp $sourceFile "$user@$host:$destinationPath"
+
+    # Check the result of the pscp command
+    if ($LASTEXITCODE -eq 0) {
+        Write-Output "[$connectionName] File transfer to $user@$host successful."
+    } else {
+        Write-Error "[$connectionName] File transfer to $user@$host failed with error code $LASTEXITCODE."
+        Write-Debug "[$connectionName] pscp exit code: $LASTEXITCODE"
+    }
+}
+
+# End the transcript for logging
+Stop-Transcript
+
+[
+  {
+    "connectionName": "Connection1",
+    "user": "user1",
+    "host": "host1",
+    "keyPath": "C:\\path\\to\\key1.ppk"
+  },
+  {
+    "connectionName": "Connection2",
+    "user": "user2",
+    "host": "host2",
+    "keyPath": "C:\\path\\to\\key2.ppk"
+  },
+  {
+    "connectionName": "Connection3",
+    "user": "user3",
+    "host": "host3",
+    "keyPath": "C:\\path\\to\\key3.ppk"
+  }
+]
+
+
+
