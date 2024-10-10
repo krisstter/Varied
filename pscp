@@ -16,45 +16,44 @@ Write-Debug "plinkPath: $plinkPath"
 Write-Debug "sourceFile: $sourceFile"
 Write-Debug "jsonParamFile: $jsonParamFile"
 
-# Automatically accept the SSH fingerprint and store it in the registry
-$env:PLINK_OPTS = "-batch -no-antispoof"  # Set environment variable to automatically accept SSH fingerprint
-
 # Loop through each entry in the JSON and perform the file transfer
 foreach ($entry in $userHostList) {
     $connectionName = $entry.connectionName
     $user = $entry.user
-    $host = $entry.host
+    $remoteHost = $entry.remoteHost  # Changed variable name to remoteHost
     $keyPath = $entry.keyPath
     $destinationPath = $entry.destinationPath
 
-    Write-Output "[$connectionName] Ensuring host key acceptance for $user@$host"
-    
-    # Pre-check to accept the SSH fingerprint using plink
-    & $plinkPath -i $keyPath $user@$host echo "Host key checked"
+    Write-Output "[$connectionName] Ensuring host key acceptance for $user@$remoteHost"
+
+    # Pre-check to accept the SSH fingerprint using cmd.exe to simulate "yes" input
+    $cmd = "cmd.exe /c echo y | $plinkPath -i $keyPath $user@$remoteHost echo 'Host key checked'"
+    Invoke-Expression $cmd
 
     # Check if the pre-check was successful
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "[$connectionName] Failed to accept host key for $user@$host"
+        Write-Error "[$connectionName] Failed to accept host key for $user@$remoteHost"
         continue
     }
 
-    Write-Output "[$connectionName] Starting file transfer for $user@$host to $destinationPath"
-    Write-Debug "[$connectionName] Connecting to $host with user: $user and key: $keyPath"
+    Write-Output "[$connectionName] Starting file transfer for $user@$remoteHost to $destinationPath"
+    Write-Debug "[$connectionName] Connecting to $remoteHost with user: $user and key: $keyPath"
     
     # Execute pscp command to copy file to UNIX host using the specified private key and destination path
-    & $pscpPath -batch -i $keyPath -scp $sourceFile "$user@$host:$destinationPath"
+    & $pscpPath -batch -i $keyPath -scp $sourceFile "$user@${remoteHost}:$destinationPath"
 
     # Check the result of the pscp command
     if ($LASTEXITCODE -eq 0) {
-        Write-Output "[$connectionName] File transfer to $user@$host successful."
+        Write-Output "[$connectionName] File transfer to $user@$remoteHost successful."
     } else {
-        Write-Error "[$connectionName] File transfer to $user@$host failed with error code $LASTEXITCODE."
+        Write-Error "[$connectionName] File transfer to $user@$remoteHost failed with error code $LASTEXITCODE."
         Write-Debug "[$connectionName] pscp exit code: $LASTEXITCODE"
     }
 }
 
 # End the transcript for logging
 Stop-Transcript
+
 
   [
   {
