@@ -4,21 +4,20 @@ Start-Transcript -Path $logFile -Append
 
 # Define variables
 $pscpPath = "C:\path\to\pscp.exe"  # Update with the correct path to pscp
+$plinkPath = "C:\path\to\plink.exe" # Update with the correct path to plink
 $sourceFile = "C:\path\to\your\file.txt"           # Update with the file you want to transfer
 $jsonParamFile = "C:\path\to\param_file.json"      # Update with your JSON parameter file path
-$destinationPath = "/path/on/unix/host"            # Update with the target directory on the UNIX server
 
 # Read the JSON param file
 $userHostList = Get-Content $jsonParamFile | ConvertFrom-Json
 
 Write-Debug "pscpPath: $pscpPath"
+Write-Debug "plinkPath: $plinkPath"
 Write-Debug "sourceFile: $sourceFile"
-Write-Debug "destinationPath: $destinationPath"
 Write-Debug "jsonParamFile: $jsonParamFile"
 
-# Automatically accept the SSH fingerprint
+# Automatically accept the SSH fingerprint and store it in the registry
 $env:PLINK_OPTS = "-batch -no-antispoof"  # Set environment variable to automatically accept SSH fingerprint
-Write-Debug "PLINK_OPTS set to -batch -no-antispoof"
 
 # Loop through each entry in the JSON and perform the file transfer
 foreach ($entry in $userHostList) {
@@ -26,11 +25,23 @@ foreach ($entry in $userHostList) {
     $user = $entry.user
     $host = $entry.host
     $keyPath = $entry.keyPath
+    $destinationPath = $entry.destinationPath
 
-    Write-Output "[$connectionName] Starting file transfer for $user@$host"
+    Write-Output "[$connectionName] Ensuring host key acceptance for $user@$host"
+    
+    # Pre-check to accept the SSH fingerprint using plink
+    & $plinkPath -i $keyPath $user@$host echo "Host key checked"
+
+    # Check if the pre-check was successful
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[$connectionName] Failed to accept host key for $user@$host"
+        continue
+    }
+
+    Write-Output "[$connectionName] Starting file transfer for $user@$host to $destinationPath"
     Write-Debug "[$connectionName] Connecting to $host with user: $user and key: $keyPath"
     
-    # Execute pscp command to copy file to UNIX host using the specified private key
+    # Execute pscp command to copy file to UNIX host using the specified private key and destination path
     & $pscpPath -batch -i $keyPath -scp $sourceFile "$user@$host:$destinationPath"
 
     # Check the result of the pscp command
@@ -45,26 +56,30 @@ foreach ($entry in $userHostList) {
 # End the transcript for logging
 Stop-Transcript
 
-[
+  [
   {
     "connectionName": "Connection1",
     "user": "user1",
     "host": "host1",
-    "keyPath": "C:\\path\\to\\key1.ppk"
+    "keyPath": "C:\\path\\to\\key1.ppk",
+    "destinationPath": "/path/on/host1"
   },
   {
     "connectionName": "Connection2",
     "user": "user2",
     "host": "host2",
-    "keyPath": "C:\\path\\to\\key2.ppk"
+    "keyPath": "C:\\path\\to\\key2.ppk",
+    "destinationPath": "/path/on/host2"
   },
   {
     "connectionName": "Connection3",
     "user": "user3",
     "host": "host3",
-    "keyPath": "C:\\path\\to\\key3.ppk"
+    "keyPath": "C:\\path\\to\\key3.ppk",
+    "destinationPath": "/path/on/host3"
   }
 ]
+
 
 
 
