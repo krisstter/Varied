@@ -38,9 +38,23 @@ foreach ($entry in $userHostList) {
         # Prepare the registry key name (PuTTY uses this format: e.g., "rsa2@22:hostname")
         $regKeyName = "$hostKeyType@22:$remoteHost"
 
-        # Add the host key to the Windows registry
-        Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
-        New-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey -PropertyType String
+        # Check if the registry key for this host already exists
+        if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
+            # Registry entry exists, compare fingerprints
+            $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
+
+            if ($existingHostKey -eq $cleanedHostKey) {
+                Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
+            } else {
+                # Host key changed, update the key in the registry
+                Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
+                Set-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey
+            }
+        } else {
+            # Host key does not exist, add it to the registry
+            Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
+            New-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey -PropertyType String
+        }
     } else {
         Write-Error "[$connectionName] Failed to retrieve host key for $user@$remoteHost"
     }
