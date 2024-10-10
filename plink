@@ -27,35 +27,41 @@ foreach ($entry in $userHostList) {
     # Retrieve the host key by running plink in verbose mode
     $plinkOutput = & $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit 2>&1
 
-    # Extract the host key from the plink output
-    if ($plinkOutput -match "The server's (rsa2|ecdsa-sha2-nistp256) key fingerprint is: ([a-zA-Z0-9:]+)") {
-        $hostKeyType = $matches[1]     # Key type (rsa2, ecdsa, etc.)
-        $hostKeyFingerprint = $matches[2]  # The actual key fingerprint
+    # Look for the line that contains "host key fingerprint is:"
+    $fingerprintIndex = [array]::IndexOf($plinkOutput, 'host key fingerprint is:')
+    if ($fingerprintIndex -ne -1) {
+        # The fingerprint is on the next line after "host key fingerprint is:"
+        $fingerprintLine = $plinkOutput[$fingerprintIndex + 1]
 
-        # Convert fingerprint to format used in PuTTY registry (PuTTY stores keys without colons)
-        $cleanedHostKey = $hostKeyFingerprint -replace ":", ""
+        # Extract the host key type and fingerprint from the line (e.g., "ssh-rsa 2048 SHA256:fingerprintid")
+        if ($fingerprintLine -match "(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
+            $hostKeyType = $matches[1]     # Key type (e.g., ssh-rsa)
+            $hostKeyFingerprint = $matches[2]  # The actual SHA256 fingerprint
 
-        # Prepare the registry key name (PuTTY uses this format: e.g., "rsa2@22:hostname")
-        $regKeyName = "$hostKeyType@22:$remoteHost"
+            # Prepare the registry key name (PuTTY uses this format: e.g., "ssh-rsa@22:hostname")
+            $regKeyName = "$hostKeyType@22:$remoteHost"
 
-        # Check if the registry key for this host already exists
-        if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
-            # Registry entry exists, compare fingerprints
-            $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
+            # Check if the registry key for this host already exists
+            if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
+                # Registry entry exists, compare fingerprints
+                $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
 
-            if ($existingHostKey -eq $cleanedHostKey) {
-                Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
+                if ($existingHostKey -eq "SHA256:$hostKeyFingerprint") {
+                    Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
+                } else {
+                    # Host key changed, update the key in the registry
+                    Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
+                    Set-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint"
+                }
             } else {
-                # Host key changed, update the key in the registry
-                Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
-                Set-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey
+                # Host key does not exist, add it to the registry
+                Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
+                New-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint" -PropertyType String
             }
         } else {
-            # Host key does not exist, add it to the registry
-            Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
-            New-ItemProperty -Path $regPath -Name $regKeyName -Value $cleanedHostKey -PropertyType String
+            Write-Error "[$connectionName] Failed to parse host key fingerprint for $user@$remoteHost"
         }
     } else {
-        Write-Error "[$connectionName] Failed to retrieve host key for $user@$remoteHost"
+        Write-Error "[$connectionName] Failed to retrieve host key fingerprint for $user@$remoteHost"
     }
 }
