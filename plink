@@ -24,109 +24,36 @@ foreach ($entry in $userHostList) {
 
     Write-Output "[$connectionName] Retrieving host key for $user@$remoteHost"
 
-    # Retrieve the host key by running plink in verbose mode
-    $plinkOutput = & $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit 2>&1
+    # Automatically accept the host key by simulating "yes" response via cmd.exe
+    $cmd = "cmd.exe /c echo y | $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit"
+    $plinkOutput = Invoke-Expression $cmd
 
-    # Look for the line that contains "host key fingerprint is:"
-    $fingerprintIndex = [array]::IndexOf($plinkOutput, 'host key fingerprint is:')
-    if ($fingerprintIndex -ne -1) {
-        # The fingerprint is on the next line after "host key fingerprint is:"
-        $fingerprintLine = $plinkOutput[$fingerprintIndex + 1]
+    # Use regular expression to match both "Host key fingerprint is" and the fingerprint itself
+    if ($plinkOutput -match "Host key fingerprint is:\r?\n(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
+        $hostKeyType = $matches[1]     # Key type (e.g., ssh-rsa)
+        $hostKeyFingerprint = $matches[2]  # The actual SHA256 fingerprint
 
-        # Extract the host key type and fingerprint from the line (e.g., "ssh-rsa 2048 SHA256:fingerprintid")
-        if ($fingerprintLine -match "(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
-            $hostKeyType = $matches[1]     # Key type (e.g., ssh-rsa)
-            $hostKeyFingerprint = $matches[2]  # The actual SHA256 fingerprint
+        # Prepare the registry key name (PuTTY uses this format: e.g., "ssh-rsa@22:hostname")
+        $regKeyName = "$hostKeyType@22:$remoteHost"
 
-            # Prepare the registry key name (PuTTY uses this format: e.g., "ssh-rsa@22:hostname")
-            $regKeyName = "$hostKeyType@22:$remoteHost"
+        # Check if the registry key for this host already exists
+        if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
+            # Registry entry exists, compare fingerprints
+            $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
 
-            # Check if the registry key for this host already exists
-            if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
-                # Registry entry exists, comp  $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
-
-                if ($existingHostKey -eq "SHA256:$hostKeyFingerprint") {
-                    Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
-                } else {
-                    # Host key changed, update the key in the registry
-                    Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
-                    Set-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint"
-                }
+            if ($existingHostKey -eq "SHA256:$hostKeyFingerprint") {
+                Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
             } else {
-                # Host key does not exist, add it to the registry
-                Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
-                New-ItemPrope# Define variables
-$plinkPath = "C:\path\to\plink.exe"   # Update with the correct path to plink
-$jsonParamFile = "C:\path\to\param_file.json"  # Update with your JSON parameter file path
-
-# Registry path for storing SSH host keys
-$regBasePath = "HKCU:\Software\SimonTatham\PuTTY"
-$regPath = "$regBasePath\SshHostKeys"
-
-# Check if the base registry path exists, if not, create it
-if (-not (Test-Path $regPath)) {
-    Write-Output "Registry path for SSH host keys not found, creating it..."
-    New-Item -Path $regBasePath -Name "SshHostKeys" -Force
-}
-
-# Read the JSON param file
-$userHostList = Get-Content $jsonParamFile | ConvertFrom-Json
-
-# Loop through each entry in the JSON and retrieve/store host key
-foreach ($entry in $userHostList) {
-    $connectionName = $entry.connectionName
-    $user = $entry.user
-    $remoteHost = $entry.remoteHost  # Changed variable name to remoteHost
-    $keyPath = $entry.keyPath
-
-    Write-Output "[$connectionName] Retrieving host key for $user@$remoteHost"
-
-    # Retrieve the host key by running plink in verbose mode
-    $plinkOutput = & $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit 2>&1
-
-    # Look for the line that contains "host key fingerprint is:"
-    $fingerprintIndex = [array]::IndexOf($plinkOutput, 'host key fingerprint is:')
-    if ($fingerprintIndex -ne -1) {
-        # The fingerprint is on the next line after "host key fingerprint is:"
-        $fingerprintLine = $plinkOutput[$fingerprintIndex + 1]
-
-        # Extract the host key type and fingerprint from the line (e.g., "ssh-rsa 2048 SHA256:fingerprintid")
-        if ($fingerprintLine -match "(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
-            $hostKeyType = $matches[1]     # Key type (e.g., ssh-rsa)
-            $hostKeyFingerprint = $matches[2]  # The actual SHA256 fingerprint
-
-            # Prepare the registry key name (PuTTY uses this format: e.g., "ssh-rsa@22:hostname")
-            $regKeyName = "$hostKeyType@22:$remoteHost"
-
-            # Check if the registry key for this host already exists
-            if (Get-ItemProperty -Path $regPath -Name $regKeyName -ErrorAction SilentlyContinue) {
-                # Registry entry exists, comp  $existingHostKey = (Get-ItemProperty -Path $regPath).$regKeyName
-
-                if ($existingHostKey -eq "SHA256:$hostKeyFingerprint") {
-                    Write-Output "[$connectionName] Host key for $remoteHost is already up to date."
-                } else {
-                    # Host key changed, update the key in the registry
-                    Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
-                    Set-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint"
-                }
-            } else {
-                # Host key does not exist, add it to the registry
-                Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
-                New-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint" -PropertyType String
+                # Host key changed, update the key in the registry
+                Write-Warning "[$connectionName] Host key for $remoteHost has changed! Updating the key in the registry."
+                Set-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint"
             }
         } else {
-            Write-Error "[$connectionName] Failed to parse host key fingerprint for $user@$remoteHost"
+            # Host key does not exist, add it to the registry
+            Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
+            New-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint" -PropertyType String
         }
     } else {
-        Write-Error "[$connectionName] Failed to retrieve host key fingerprint for $user@$remoteHost"
-    }
-}
-rty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint" -PropertyType String
-            }
-        } else {
-            Write-Error "[$connectionName] Failed to parse host key fingerprint for $user@$remoteHost"
-        }
-    } else {
-        Write-Error "[$connectionName] Failed to retrieve host key fingerprint for $user@$remoteHost"
+        Write-Error "[$connectionName] Failed to retrieve or parse host key fingerprint for $user@$remoteHost"
     }
 }
