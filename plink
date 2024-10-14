@@ -27,14 +27,25 @@ foreach ($entry in $userHostList) {
     # Create the plink arguments
     $arguments = "-v -ssh -i `"$keyPath`" $user@$remoteHost echo Host key checked"
 
-    # Start the process with input redirection to automatically accept the host key
-    $process = Start-Process -FilePath $plinkPath -ArgumentList $arguments -NoNewWindow -RedirectStandardInput "Yes" -RedirectStandardOutput -PassThru
+    # Set up the start info for process execution
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $plinkPath
+    $startInfo.Arguments = $arguments
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
 
-    # Wait for the process to complete
-    $process.WaitForExit()
+    # Start the process and capture output
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    $process.Start() | Out-Null
+    $process.StandardInput.WriteLine("y")
+    $process.StandardInput.Close()
 
-    # Capture the output from plink
+    # Capture the output
     $plinkOutput = $process.StandardOutput.ReadToEnd()
+    $process.WaitForExit()
 
     # Use regular expression to match both "Host key fingerprint is" and the fingerprint itself
     if ($plinkOutput -match "Host key fingerprint is:\r?\n(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
@@ -59,9 +70,4 @@ foreach ($entry in $userHostList) {
         } else {
             # Host key does not exist, add it to the registry
             Write-Output "[$connectionName] Adding host key to registry for $remoteHost"
-            New-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint" -PropertyType String
-        }
-    } else {
-        Write-Error "[$connectionName] Failed to retrieve or parse host key fingerprint for $user@$remoteHost"
-    }
-}
+            New-ItemProperty -Path $regPath -Name $regKeyName -Value "SHA256:$hostKeyFingerprint
