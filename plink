@@ -24,9 +24,17 @@ foreach ($entry in $userHostList) {
 
     Write-Output "[$connectionName] Retrieving host key for $user@$remoteHost"
 
-    # Automatically accept the host key by simulating "yes" response via cmd.exe
-    $cmd = "cmd.exe /c echo y | $plinkPath -v -ssh -i $keyPath $user@$remoteHost exit"
-    $plinkOutput = Invoke-Expression $cmd
+    # Create the plink arguments
+    $arguments = "-v -ssh -i `"$keyPath`" $user@$remoteHost echo Host key checked"
+
+    # Start the process with input redirection to automatically accept the host key
+    $process = Start-Process -FilePath $plinkPath -ArgumentList $arguments -NoNewWindow -RedirectStandardInput "Yes" -RedirectStandardOutput -PassThru
+
+    # Wait for the process to complete
+    $process.WaitForExit()
+
+    # Capture the output from plink
+    $plinkOutput = $process.StandardOutput.ReadToEnd()
 
     # Use regular expression to match both "Host key fingerprint is" and the fingerprint itself
     if ($plinkOutput -match "Host key fingerprint is:\r?\n(ssh-[a-zA-Z0-9-]+) \d+ SHA256:([a-zA-Z0-9+/=]+)") {
