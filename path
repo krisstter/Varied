@@ -1,0 +1,39 @@
+# Get the PATH environment variable and split it into individual directories
+$paths = $env:PATH -split ';'
+
+# Define the name of the file you are looking for
+$fortifyBat = "fortify.bat"
+
+# Check if the file exists in any of the directories listed in PATH
+$fortifyExists = $false
+foreach ($path in $paths) {
+    if (Test-Path (Join-Path $path $fortifyBat)) {
+        $fortifyExists = $true
+        break
+    }
+}
+
+# If fortify.bat is found, proceed with execution
+if ($fortifyExists) {
+    Write-Host "Fortify.bat is already in the PATH."
+    & "fortify.bat"
+} else {
+    Write-Host "Fortify.bat not found in PATH. Attempting to add it."
+
+    # Define the full path where fortify.bat resides (replace this with the actual path)
+    $fortifyBatDirectory = "C:\path\to\fortify"  # Replace with the actual directory path
+
+    # Check if fortify.bat exists in the specified directory
+    if (Test-Path (Join-Path $fortifyBatDirectory $fortifyBat)) {
+        # Append the directory to the system PATH
+        [System.Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";$fortifyBatDirectory", [System.EnvironmentVariableTarget]::Process)
+
+        Write-Host "Fortify.bat directory added to PATH."
+
+        # Run the fortify.bat after updating the PATH
+        & (Join-Path $fortifyBatDirectory $fortifyBat)
+    } else {
+        Write-Host "Fortify.bat could not be found in the specified directory."
+        exit 1  # Optionally exit with a failure code
+    }
+}
